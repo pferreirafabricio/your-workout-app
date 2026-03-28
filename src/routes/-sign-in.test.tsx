@@ -58,7 +58,7 @@ describe("sign-in route integration", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
     fireEvent.submit(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByText(/Too many failed attempts\. Try again in 120 seconds\./)).toBeTruthy();
+    expect(await screen.findByText(/Too many failed attempts\. Try again in 2 minutes\./)).toBeTruthy();
     expect(navigateMock).not.toHaveBeenCalled();
   });
 });

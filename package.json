@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "generate": "prisma generate",
     "test": "bun run test:e2e",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run src",
     "test:integration": "echo 'Integration tests are not implemented yet. Placeholder stage passed.'",
     "test:e2e": "playwright test",
     "test:ui": "playwright test --ui"

@@ -1,9 +1,11 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
+
+const isTest = !!process.env.VITEST;
 
 const config = defineConfig({
   plugins: [
@@ -11,13 +13,19 @@ const config = defineConfig({
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
-    tailwindcss(),
-    tanstackStart(),
-    nitro({
-      preset: "node-server",
-    }),
+    !isTest && tailwindcss(),
+    !isTest && tanstackStart(),
+    !isTest &&
+      nitro({
+        preset: "node-server",
+      }),
     viteReact(),
-  ],
+  ].filter(Boolean),
+  test: {
+    globals: true,
+    environment: "jsdom",
+    css: true,
+  },
   build: {
     sourcemap: process.env.ENVIRONMENT === "development" || process.env.ENVIRONMENT === "test",
   },

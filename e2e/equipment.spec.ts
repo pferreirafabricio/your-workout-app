@@ -3,8 +3,6 @@ import { createAccountAndSignIn } from "./helpers/auth";
 
 test.describe("Equipment", () => {
   test("loads equipment page and can create equipment", async ({ page }) => {
-    await createAccountAndSignIn(page, "equipment-create");
-
     await page.goto("/equipment");
     await expect(page.getByRole("heading", { name: "Equipment" })).toBeVisible();
 
@@ -20,14 +18,14 @@ test.describe("Equipment", () => {
     await expect(page.getByText(`code: ${code}`)).toBeVisible();
   });
 
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("redirects unauthenticated users to sign-in", async ({ page }) => {
-    await page.goto("/logout");
     await page.goto("/equipment");
     await expect(page).toHaveURL(/\/sign-in/);
   });
 
   test("surfaces safe error state when csrf token is invalid", async ({ page }) => {
-    await createAccountAndSignIn(page, "equipment-csrf");
     await page.goto("/equipment");
 
     await page.evaluate(() => {
@@ -44,7 +42,6 @@ test.describe("Equipment", () => {
   });
 
   test("edits and archives an equipment row", async ({ page }) => {
-    await createAccountAndSignIn(page, "equipment-edit");
     await page.goto("/equipment");
 
     const suffix = Date.now();
