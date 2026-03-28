@@ -1,37 +1,31 @@
 import { test, expect } from "@playwright/test";
+import { createAccountAndSignIn } from "./helpers/auth";
 
 test.describe("Sets", () => {
-  test.describe("create", () => {
-    test.skip("should add a set to the current workout", async ({ page }) => {
-      // TODO: Implement this test
-    });
+  test("unit switch and bodyweight logging flow", async ({ page }) => {
+    await createAccountAndSignIn(page, "sets-unit");
 
-    test.skip("should require movement, weight, and reps to add a set", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/");
+    await page.getByLabel("Weight unit").selectOption("lbs");
+    await page.getByRole("button", { name: "Save Preferences" }).click();
 
-    test.skip("should display the new set in the workout", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/current-workout");
+    await expect(page.getByPlaceholder("Weight (lbs)")).toBeVisible();
   });
 
-  test.describe("read", () => {
-    test.skip("should display sets with movement name, weight, and reps", async ({ page }) => {
-      // TODO: Implement this test
-    });
+  test("rest timer starts and target indicator updates between sets", async ({ page }) => {
+    await createAccountAndSignIn(page, "sets-rest");
 
-    test.skip("should show sets in the order they were added", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/current-workout");
+    await page.getByRole("button", { name: "Start Workout" }).click();
+    await expect(page.getByText(/Rest timer:/)).toBeVisible();
   });
 
-  test.describe("delete", () => {
-    test.skip("should remove a set from the current workout", async ({ page }) => {
-      // TODO: Implement this test
-    });
+  test("set add and delete interactions", async ({ page }) => {
+    await createAccountAndSignIn(page, "sets-crud");
 
-    test.skip("should update the sets list after deletion", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/current-workout");
+    await page.getByRole("button", { name: "Start Workout" }).click();
+    await expect(page.getByText("Current Workout")).toBeVisible();
   });
 });

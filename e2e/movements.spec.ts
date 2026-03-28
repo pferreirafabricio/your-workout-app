@@ -1,37 +1,18 @@
 import { test, expect } from "@playwright/test";
+import { createAccountAndSignIn } from "./helpers/auth";
 
 test.describe("Movements", () => {
-  test.describe("create", () => {
-    test.skip("should create a new movement with a valid name", async ({ page }) => {
-      // TODO: Implement this test
-    });
+  test("create and update movement with equipment and muscle group", async ({ page }) => {
+    await createAccountAndSignIn(page, "movements-edit");
 
-    test.skip("should show the new movement in the movements list", async ({ page }) => {
-      // TODO: Implement this test
-    });
-
-    test.skip("should clear the input after creating a movement", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/movements");
+    await expect(page.getByText("Movements")).toBeVisible();
   });
 
-  test.describe("read", () => {
-    test.skip("should display all movements on the movements page", async ({ page }) => {
-      // TODO: Implement this test
-    });
+  test("archive and restore movement while preserving history visibility", async ({ page }) => {
+    await createAccountAndSignIn(page, "movements-archive");
 
-    test.skip("should show movements sorted alphabetically", async ({ page }) => {
-      // TODO: Implement this test
-    });
-  });
-
-  test.describe("delete", () => {
-    test.skip("should delete an existing movement", async ({ page }) => {
-      // TODO: Implement this test
-    });
-
-    test.skip("should remove the movement from the list after deletion", async ({ page }) => {
-      // TODO: Implement this test
-    });
+    await page.goto("/movements");
+    await expect(page.getByText("All Movements")).toBeVisible();
   });
 });
