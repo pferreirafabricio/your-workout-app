@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -172,7 +173,9 @@ function RootDocument({ children }: Readonly<{ children: React.ReactNode }>) {
         <HeadContent />
       </head>
       <body className="overflow-x-hidden font-sans antialiased text-slate-900 bg-[radial-gradient(circle_at_top,_#e8f5f9_0%,_#f4f9fb_36%,_#ffffff_70%)]">
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
         <Toaster position="top-right" duration={4000} richColors />
         {config.environment === "development" && (
           <TanStackDevtools

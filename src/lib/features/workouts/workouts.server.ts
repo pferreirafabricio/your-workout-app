@@ -899,13 +899,15 @@ export const getWorkoutHistoryServerFn = createServerFn()
 
     return workouts.map((workout: any) => {
       const projectedSets = workout.sets.map((set: any) => projectSetForDisplay(set, preferredUnit));
+      const calculatedSummary = calculateWorkoutSummary(workout.startedAt, workout.completedAt, projectedSets);
+      const uniqueExercises = new Set(projectedSets.map((set: ProjectedSet) => set.movement.id)).size;
+
       return {
         ...workout,
         sets: projectedSets,
         summary: {
-          totalSets: projectedSets.length,
-          totalVolumeKg:
-            Math.round(projectedSets.reduce((sum: number, set: ProjectedSet) => sum + set.volumeKg, 0) * 100) / 100,
+          ...calculatedSummary,
+          uniqueExercises,
         },
       };
     });
