@@ -16,6 +16,9 @@ export const mutationErrorMessages = {
   setNotFound: "Set not found for your active workout.",
   workoutNotFound: "Workout not found.",
   lockout: "Too many failed sign-in attempts. Please wait before trying again.",
+  equipmentConflict: "Equipment code or name already exists.",
+  equipmentNotFound: "Equipment not found.",
+  persistenceError: "We could not save your changes. Please try again.",
 } as const;
 
 export const strongPasswordSchema = z
@@ -96,6 +99,29 @@ export const updateMovementInputSchema = createMovementInputSchema.extend({
 export const archiveMovementInputSchema = z.object({
   movementId: z.string().min(1),
   archive: z.boolean().default(true),
+});
+
+const equipmentCodeInputSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_\-\s]+$/)
+  .transform((value) => value.toUpperCase().replaceAll(/[\s-]+/g, "_"));
+
+export const createEquipmentInputSchema = z.object({
+  code: equipmentCodeInputSchema,
+  name: z.string().trim().min(1).max(120),
+  displayOrder: z.number().int().min(0).max(9999),
+});
+
+export const updateEquipmentInputSchema = createEquipmentInputSchema.extend({
+  equipmentId: z.string().min(1),
+});
+
+export const setEquipmentActiveStateInputSchema = z.object({
+  equipmentId: z.string().min(1),
+  isActive: z.boolean(),
 });
 
 export const signInInputSchema = z.object({

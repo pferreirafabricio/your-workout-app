@@ -34,5 +34,6 @@ describe("movements query integration", () => {
 
     expect(options.queryKey).toEqual(["equipment-catalog"]);
     expect(result[0]?.code).toBe("barbell");
+    expect(result.every((item) => item.isActive)).toBe(true);
   });
 });
