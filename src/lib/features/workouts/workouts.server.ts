@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getServerSidePrismaClient } from "@/lib/db.server";
-import { authMiddleware, csrfProtectionMiddleware } from "@/lib/auth.server";
-import { Prisma } from "../../prisma/generated/client/client";
+import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
+import { Prisma } from "../../../../prisma/generated/client/client";
 import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/types";
-import { fromCanonicalKg, toCanonicalKg } from "@/lib/utils";
+import { fromCanonicalKg, toCanonicalKg } from "@/lib/shared/utils";
 import {
   addSetInputSchema,
   deleteSetInputSchema,
@@ -15,7 +15,7 @@ import {
   setUserPreferencesInputSchema,
   updateSetInputSchema,
   workoutHistoryInputSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 
 type ProjectedSet = {
   id: string;

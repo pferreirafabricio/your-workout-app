@@ -3,7 +3,7 @@ import {
   createEquipmentInputSchema,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 
 describe("equipment validation schemas", () => {
   it("normalizes equipment code and accepts valid create payload", () => {

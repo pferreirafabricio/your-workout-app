@@ -6,9 +6,9 @@ import { SaveButton, SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "./_layout.current-workout/-queries/current-workout";
-import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/workouts.server";
-import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/validation/workout-progression";
-import { formatDateTime, formatWeight } from "@/lib/utils";
+import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/features/workouts/workouts.server";
+import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workout-progression";
+import { formatDateTime, formatWeight } from "@/lib/shared/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
 

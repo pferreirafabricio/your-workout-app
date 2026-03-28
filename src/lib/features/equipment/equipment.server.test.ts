@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEquipmentServerFn } from "@/lib/equipment.server";
+import { createEquipmentServerFn } from "@/lib/features/equipment/equipment.server";
 
 describe("equipment server", () => {
   it("returns validation-safe error when create payload is invalid", async () => {

@@ -1,4 +1,4 @@
-import { logoutServerFn } from "@/lib/auth.server";
+import { logoutServerFn } from "@/lib/features/auth/auth.server";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { getCsrfHeaders } from "@/lib/csrf.client";

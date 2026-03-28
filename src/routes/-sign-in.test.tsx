@@ -14,7 +14,7 @@ vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ navigate: navigateMock }),
 }));
 
-vi.mock("@/lib/auth.server", () => ({
+vi.mock("@/lib/features/auth/auth.server", () => ({
   signInServerFn: (input: unknown) => signInServerFnMock(input),
 }));
 

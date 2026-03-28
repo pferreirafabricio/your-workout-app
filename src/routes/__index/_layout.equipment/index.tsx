@@ -10,13 +10,13 @@ import {
   createEquipmentServerFn,
   setEquipmentActiveStateServerFn,
   updateEquipmentServerFn,
-} from "@/lib/equipment.server";
+} from "@/lib/features/equipment/equipment.server";
 import {
   createEquipmentInputSchema,
   mutationErrorMessages,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { equipmentManagementQueryOptions } from "./-queries/equipment";
 import { toast } from "sonner";

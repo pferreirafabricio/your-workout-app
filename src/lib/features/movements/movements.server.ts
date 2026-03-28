@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getServerSidePrismaClient } from "@/lib/db.server";
-import { authMiddleware, csrfProtectionMiddleware } from "@/lib/auth.server";
+import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
 import {
   archiveMovementInputSchema,
   createMovementInputSchema,
   mutationErrorMessages,
   updateMovementInputSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 
 export const createMovementServerFn = createServerFn({ method: "POST" })
   .middleware([csrfProtectionMiddleware, authMiddleware])

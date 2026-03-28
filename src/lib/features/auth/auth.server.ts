@@ -13,12 +13,12 @@ import {
   accessTokenCookieName,
   csrfTokenCookieName,
   refreshTokenCookieName,
-} from "./auth.consts";
-import { getServerSidePrismaClient } from "./db.server";
+} from "@/lib/features/auth/auth.consts";
+import { getServerSidePrismaClient } from "@/lib/db.server";
 import {
   signInInputSchema,
   strongPasswordSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 import { z } from "zod";
 
 // In production, use a proper secret from environment variables
@@ -30,7 +30,7 @@ const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
 
 const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-import { DEFAULT_REST_TARGET_SECONDS } from "./types";
+import { DEFAULT_REST_TARGET_SECONDS } from "@/lib/types";
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {

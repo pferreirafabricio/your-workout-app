@@ -3,7 +3,7 @@ import {
   buildProgressionSeries,
   calculateSetVolume,
   calculateWorkoutSummary,
-} from "@/lib/workouts.server";
+} from "@/lib/features/workouts/workouts.server";
 
 describe("workouts server helpers", () => {
   it("calculates set volume using weight x reps", () => {

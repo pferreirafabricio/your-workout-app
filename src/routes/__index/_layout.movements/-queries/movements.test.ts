@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/movements.server", () => ({
+vi.mock("@/lib/features/movements/movements.server", () => ({
   getEquipmentCatalogServerFn: vi.fn(async () => [
     { id: "equipment-barbell", code: "barbell", name: "Barbell", isActive: true, displayOrder: 10 },
   ]),

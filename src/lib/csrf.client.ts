@@ -1,4 +1,4 @@
-import { csrfTokenCookieName } from "@/lib/auth.consts";
+import { csrfTokenCookieName } from "@/lib/features/auth/auth.consts";
 
 function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") {

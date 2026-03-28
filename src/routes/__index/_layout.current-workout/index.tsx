@@ -11,7 +11,7 @@ import {
   addSetServerFn,
   updateSetServerFn,
   deleteSetServerFn,
-} from "@/lib/workouts.server";
+} from "@/lib/features/workouts/workouts.server";
 import { Play, Check, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,8 +20,8 @@ import {
   movementsQueryOptions,
   userPreferencesQueryOptions,
 } from "./-queries/current-workout";
-import { addSetInputSchema, updateSetInputSchema } from "@/lib/validation/workout-progression";
-import { formatDurationSeconds, formatWeight } from "@/lib/utils";
+import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
+import { formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";

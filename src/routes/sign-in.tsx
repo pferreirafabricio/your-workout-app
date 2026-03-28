@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
-import { signInServerFn } from "@/lib/auth.server";
-import { signInInputSchema } from "@/lib/validation/workout-progression";
+import { signInServerFn } from "@/lib/features/auth/auth.server";
+import { signInInputSchema } from "@/lib/features/workouts/workout-progression";
 import { getCsrfHeaders } from "@/lib/csrf.client";
-import { formatRetryDelay } from "@/lib/helpers/time";
+import { formatRetryDelay } from "@/lib/shared/utils/time";
 import { UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/sign-in")({

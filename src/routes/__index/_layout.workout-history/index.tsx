@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteButton } from "@/components/ui/action-buttons";
-import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
+import { deleteWorkoutsServerFn } from "@/lib/features/workouts/workouts.server";
 import { Trash2, X } from "lucide-react";
 import {
   bodyWeightHistoryQueryOptions,
@@ -11,7 +11,7 @@ import {
 } from "./-queries/workout-history";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Select } from "@/components/ui/select";
-import { formatDateTime, formatNumber, formatWeight } from "@/lib/utils";
+import { formatDateTime, formatNumber, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";

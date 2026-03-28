@@ -4,8 +4,8 @@ import {
   hashPassword,
   isWithinLockoutWindow,
   verifyPassword,
-} from "@/lib/auth.server";
-import { strongPasswordSchema } from "@/lib/validation/workout-progression";
+} from "@/lib/features/auth/auth.server";
+import { strongPasswordSchema } from "@/lib/features/workouts/workout-progression";
 
 describe("auth security helpers", () => {
   it("hashes and verifies a password", async () => {

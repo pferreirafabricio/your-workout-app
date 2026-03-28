@@ -1,4 +1,4 @@
-import { getEquipmentCatalogServerFn, getMovementsServerFn } from "@/lib/movements.server";
+import { getEquipmentCatalogServerFn, getMovementsServerFn } from "@/lib/features/movements/movements.server";
 import { queryOptions } from "@tanstack/react-query";
 
 export const movementsQueryOptions = () =>

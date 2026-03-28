@@ -1,5 +1,5 @@
-import { getWorkoutHistoryServerFn } from "@/lib/workouts.server";
-import { getBodyWeightSeriesServerFn, getProgressionSeriesServerFn } from "@/lib/workouts.server";
+import { getWorkoutHistoryServerFn } from "@/lib/features/workouts/workouts.server";
+import { getBodyWeightSeriesServerFn, getProgressionSeriesServerFn } from "@/lib/features/workouts/workouts.server";
 import { queryOptions } from "@tanstack/react-query";
 
 export const workoutHistoryQueryOptions = () =>

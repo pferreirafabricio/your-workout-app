@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { getEquipmentListServerFn } from "@/lib/equipment.server";
+import { getEquipmentListServerFn } from "@/lib/features/equipment/equipment.server";
 
 export const equipmentManagementQueryOptions = () =>
   queryOptions({

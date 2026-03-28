@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
-import { createAccountServerFn } from "@/lib/auth.server";
+import { createAccountServerFn } from "@/lib/features/auth/auth.server";
 import { z } from "zod";
 import { getCsrfHeaders } from "@/lib/csrf.client";
-import { strongPasswordSchema } from "@/lib/validation/workout-progression";
+import { strongPasswordSchema } from "@/lib/features/workouts/workout-progression";
 import { LogIn } from "lucide-react";
 
 const createAccountInputSchema = z.object({

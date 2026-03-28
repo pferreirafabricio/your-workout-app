@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import { Prisma } from "../../prisma/generated/client/client";
-import { authMiddleware, csrfProtectionMiddleware } from "@/lib/auth.server";
+import { Prisma } from "../../../../prisma/generated/client/client";
+import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
 import { getServerSidePrismaClient } from "@/lib/db.server";
 import {
   createEquipmentInputSchema,
   mutationErrorMessages,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/validation/workout-progression";
+} from "@/lib/features/workouts/workout-progression";
 
 type EquipmentMutationErrorCode = "CONFLICT" | "NOT_FOUND" | "PERSISTENCE_ERROR";
 

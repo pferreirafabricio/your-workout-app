@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/workouts.server", () => ({
+vi.mock("@/lib/features/workouts/workouts.server", () => ({
   getBodyWeightSeriesServerFn: vi.fn(async () => [{ date: "2026-03-01", weight: 80 }]),
   getProgressionSeriesServerFn: vi.fn(async () => [{ date: "2026-03-01", value: 100 }]),
   getWorkoutHistoryServerFn: vi.fn(async () => [{ id: "w1", sets: [] }]),

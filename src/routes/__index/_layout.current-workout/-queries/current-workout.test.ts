@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/workouts.server", () => ({
+vi.mock("@/lib/features/workouts/workouts.server", () => ({
   getBodyWeightSeriesServerFn: vi.fn(async () => []),
   getCurrentWorkoutServerFn: vi.fn(async () => ({ id: "w1", sets: [] })),
   getUserPreferencesServerFn: vi.fn(async () => ({ weightUnit: "kg", defaultRestTargetSeconds: 120 })),
 }));
 
-vi.mock("@/lib/movements.server", () => ({
+vi.mock("@/lib/features/movements/movements.server", () => ({
   getEquipmentCatalogServerFn: vi.fn(async () => []),
   getMovementsServerFn: vi.fn(async () => []),
 }));
@@ -18,7 +18,7 @@ import {
   movementsQueryOptions,
   userPreferencesQueryOptions,
 } from "./current-workout";
-import { updateSetInputSchema } from "@/lib/validation/workout-progression";
+import { updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
 
 describe("current workout query options", () => {
   it("creates stable query key for current workout", async () => {
