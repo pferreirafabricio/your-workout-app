@@ -25,7 +25,6 @@ services:
       retries: 5
 
   workout-app:
-    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
     container_name: demo-project
     depends_on:
       postgres:
@@ -47,7 +46,7 @@ services:
       dockerfile: Dockerfile
       target: development
     ports:
-      - ${PORT:-3000}:3000
+      - ${PORT:-3000}:${PORT:-3000}
     develop:
       watch:
         - action: sync

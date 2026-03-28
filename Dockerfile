@@ -19,6 +19,7 @@ RUN bun run generate
 # development
 FROM deps AS development
 WORKDIR /app
+USER appuser
 CMD ["vite", "dev", "--host", "0.0.0.0", "--port", "3000"]
 
 # production

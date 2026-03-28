@@ -31,7 +31,15 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- DRY/KISS/SOLID compliance risks identified and mitigated.
+- Layer boundaries enforced: business logic in server/lib layers, UI/routes orchestration only.
+- Data and security impact reviewed for schema, validation, and sensitive data handling.
+- Test strategy defined with:
+  - Unit tests for business logic changes.
+  - Integration tests for route/data boundaries where feasible.
+  - End-to-end tests for critical user journeys.
+- TanStack Router integration testing approach documented when route behavior is changed,
+  following https://tanstack.com/router/latest/docs/how-to/setup-testing where applicable.
 
 ## Project Structure
 

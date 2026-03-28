@@ -7,6 +7,10 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
+Every user story MUST identify how unit, integration, and end-to-end coverage will be
+achieved for the behavior in scope. Integration tests SHOULD be included where feasible,
+especially for route/data boundaries.
+
 <!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
@@ -28,6 +32,8 @@
 
 **Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
 
+**Test Coverage Notes**: [List required unit tests, integration tests where feasible, and e2e validation for this story]
+
 **Acceptance Scenarios**:
 
 1. **Given** [initial state], **When** [action], **Then** [expected outcome]
@@ -43,6 +49,8 @@
 
 **Independent Test**: [Describe how this can be tested independently]
 
+**Test Coverage Notes**: [List required unit tests, integration tests where feasible, and e2e validation for this story]
+
 **Acceptance Scenarios**:
 
 1. **Given** [initial state], **When** [action], **Then** [expected outcome]
@@ -56,6 +64,8 @@
 **Why this priority**: [Explain the value and why it has this priority level]
 
 **Independent Test**: [Describe how this can be tested independently]
+
+**Test Coverage Notes**: [List required unit tests, integration tests where feasible, and e2e validation for this story]
 
 **Acceptance Scenarios**:
 

@@ -1,50 +1,99 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: 1.0.0 -> 1.1.0
+- Modified principles:
+	- V. Test-Gated Reliability -> V. Test-Gated Reliability Across Unit, Integration, and E2E
+- Added sections:
+	- None
+- Removed sections:
+	- None
+- Templates requiring updates:
+	- ✅ updated: .specify/templates/plan-template.md
+	- ✅ updated: .specify/templates/spec-template.md
+	- ✅ updated: .specify/templates/tasks-template.md
+	- ✅ reviewed (no files present): .specify/templates/commands/*.md
+- Runtime guidance reviewed:
+	- ✅ reviewed (no change required): README.md
+- Follow-up TODOs:
+	- None
+-->
+
+# Better Bookkeeping Demo App Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. DRY, KISS, SOLID as Non-Negotiable Design Rules
+All production code MUST follow DRY, KISS, and SOLID. Duplicate logic across routes,
+components, and server functions MUST be refactored into reusable modules. New abstractions
+MUST solve a concrete repeated problem, not speculative design.
+Rationale: keeps implementation simple, maintainable, and scalable as features grow.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Layered Boundaries and Strict Type Contracts
+Business rules MUST live in server and library layers, not in route handlers or presentation
+components. Routes and UI components MUST remain orchestration-only and side-effect minimal.
+All boundary inputs and outputs MUST be explicitly typed and validated.
+Rationale: preserves separation of concerns and prevents fragile cross-layer coupling.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Data Integrity and Query Efficiency
+Prisma schema and migrations MUST be the single source of truth for data model changes.
+Features that compute history or progression metrics MUST produce correct time-series results
+and use query patterns that are explainable and efficient. Complex optimization is permitted
+only with measured evidence.
+Rationale: protects data correctness while preventing unnecessary complexity.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Security-First Authentication and Validation
+Passwords MUST be stored only as strong adaptive hashes and verified using constant-time
+safe library methods. Plaintext passwords and reversible storage are prohibited. Server-side
+validation is mandatory for all mutation inputs, and sensitive data exposure MUST be minimized.
+Rationale: reduces risk of credential compromise and insecure data handling.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Test-Gated Reliability Across Unit, Integration, and E2E
+All feature work MUST include a test strategy covering unit tests for business logic,
+integration tests for route/data boundaries where feasible, and end-to-end tests for
+critical user journeys. Critical CRUD paths for movements, sets, and workouts MUST have
+Playwright coverage. Regression tests MUST exist for body-weight defaulting and progression
+metrics (max weight, total reps, total volume). For TanStack Router route behavior,
+integration testing SHOULD follow the official setup guidance from
+https://tanstack.com/router/latest/docs/how-to/setup-testing when applicable.
+Rationale: layered testing catches defects earlier and protects end-user behavior in CI.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. Incremental Delivery Discipline
+Every change MUST map to explicit requirements, remain small enough for focused review,
+and use Conventional Commits. Pull requests MUST document notable tradeoffs when complexity
+is introduced.
+Rationale: improves review quality, traceability, and long-term velocity.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## Technical Standards
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- Stack constraints: TanStack Start, TanStack Router, TanStack Query, TanStack Form,
+	Prisma with PostgreSQL, Bun runtime, Playwright e2e.
+- TypeScript strictness MUST remain enabled; type safety regressions are prohibited.
+- Feature work MUST preserve route-level performance and correctness for workout and
+	progression data workflows.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Workflow and Quality Gates
+
+- Specification MUST define independent user scenarios and measurable acceptance criteria.
+- Plan MUST pass a constitution check before implementation begins.
+- Tasks MUST include test work for critical behavior and security-sensitive flows.
+- Tasks MUST include unit tests and integration tests where feasible, not only e2e checks.
+- Merges require: passing CI, required tests, and reviewer confirmation of constitution
+	compliance.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution overrides conflicting local practices for implementation and review.
+Amendments require a pull request that includes: proposed text changes, rationale,
+impact analysis, and required template updates.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Versioning policy:
+- MAJOR for backward-incompatible governance changes or principle removals/redefinitions.
+- MINOR for new principles/sections or materially expanded obligations.
+- PATCH for clarifications and non-semantic wording improvements.
+
+Compliance review policy:
+- Each plan MUST include a constitution gate.
+- Each pull request MUST include an explicit compliance check.
+- Exceptions MUST be time-boxed, documented, and approved by maintainers.
+
+**Version**: 1.1.0 | **Ratified**: 2026-03-27 | **Last Amended**: 2026-03-28
