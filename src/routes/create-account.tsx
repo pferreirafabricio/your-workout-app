@@ -4,6 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createAccountServerFn } from "@/lib/auth.server";
+import { z } from "zod";
+
+const createAccountInputSchema = z.object({
+  email: z.string().email(),
+  name: z.string().trim().min(1).max(120),
+  password: z.string().min(8).max(256),
+});
 
 export const Route = createFileRoute("/create-account")({
   beforeLoad: ({ context }) => {
@@ -28,16 +35,20 @@ function CreateAccountPage() {
     setIsLoading(true);
 
     try {
-      console.log("Creating account", { email, name, password });
-      const result = await createAccountServerFn({ data: { email, name, password } });
-      console.log("Result", result);
+      const parsed = createAccountInputSchema.safeParse({ email, name, password });
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Invalid account details.");
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await createAccountServerFn({ data: parsed.data });
       if (result.success) {
         router.navigate({ to: "/" });
       } else {
         setError(result.error || "Account creation failed");
       }
-    } catch (error) {
-      console.error("Error creating account", error);
+    } catch {
       setError("An unexpected error occurred");
     } finally {
       setIsLoading(false);
@@ -96,10 +107,10 @@ function CreateAccountPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
               />
-              <p className="text-xs text-gray-500">Must be at least 6 characters</p>
+              <p className="text-xs text-gray-500">Must be at least 8 characters</p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create account"}

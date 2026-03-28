@@ -8,17 +8,27 @@ import {
   createWorkoutServerFn,
   completeWorkoutServerFn,
   addSetServerFn,
+  updateSetServerFn,
   deleteSetServerFn,
 } from "@/lib/workouts.server";
-import { Play, Check, Plus, X } from "lucide-react";
+import { Play, Check, Plus, X, Save, PencilLine } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
+import {
+  bodyWeightSeriesQueryOptions,
+  currentWorkoutQueryOptions,
+  movementsQueryOptions,
+  userPreferencesQueryOptions,
+} from "./-queries/current-workout";
+import { addSetInputSchema, updateSetInputSchema } from "@/lib/validation/workout-progression";
+import { formatDurationSeconds, formatWeight } from "@/lib/utils";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(currentWorkoutQueryOptions()),
       context.queryClient.ensureQueryData(movementsQueryOptions()),
+      context.queryClient.ensureQueryData(userPreferencesQueryOptions()),
+      context.queryClient.ensureQueryData(bodyWeightSeriesQueryOptions()),
     ]);
   },
   component: CurrentWorkoutPage,
@@ -28,9 +38,19 @@ function CurrentWorkoutPage() {
   const queryClient = useQueryClient();
   const { data: workout } = useSuspenseQuery(currentWorkoutQueryOptions());
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
+  const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions());
+  const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightSeriesQueryOptions());
   const [selectedMovement, setSelectedMovement] = useState("");
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
+  const [rpe, setRpe] = useState("");
+  const [notes, setNotes] = useState("");
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [setFormError, setSetFormError] = useState("");
+  const [completionSummary, setCompletionSummary] = useState<{
+    durationSeconds: number;
+    totalVolumeKg: number;
+  } | null>(null);
 
   const createWorkoutMutation = useMutation({
     mutationFn: () => createWorkoutServerFn(),
@@ -41,17 +61,63 @@ function CurrentWorkoutPage() {
 
   const completeWorkoutMutation = useMutation({
     mutationFn: () => completeWorkoutServerFn(),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      if (response.success) {
+        setCompletionSummary({
+          durationSeconds: response.summary.durationSeconds,
+          totalVolumeKg: response.summary.totalVolumeKg,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+      queryClient.invalidateQueries({ queryKey: ["workout-history"] });
     },
   });
 
   const addSetMutation = useMutation({
-    mutationFn: (data: { movementId: string; reps: number; weight: number }) =>
+    mutationFn: (data: {
+      movementId: string;
+      reps: number;
+      weight?: number;
+      rpe?: number | null;
+      notes?: string | null;
+      loggedAt?: string;
+    }) =>
       addSetServerFn({ data }),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      if (!response.success) {
+        setSetFormError(response.error ?? "Unable to save set.");
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       setReps("");
+      setWeight("");
+      setRpe("");
+      setNotes("");
+      setSetFormError("");
+    },
+  });
+
+  const updateSetMutation = useMutation({
+    mutationFn: (data: {
+      setId: string;
+      reps?: number;
+      weight?: number;
+      rpe?: number | null;
+      notes?: string | null;
+      expectedVersion?: number;
+    }) => updateSetServerFn({ data }),
+    onSuccess: (response) => {
+      if (!response.success) {
+        setSetFormError(response.error ?? "Unable to update set.");
+        return;
+      }
+
+      if (response.replacementNotice) {
+        setSetFormError(response.replacementNotice.message);
+      }
+
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+      setEditingSetId(null);
     },
   });
 
@@ -64,12 +130,79 @@ function CurrentWorkoutPage() {
 
   const handleAddSet = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMovement || !reps || !weight) return;
-    addSetMutation.mutate({
+
+    const parsedReps = Number(reps);
+    const parsedWeight = weight.trim() === "" ? undefined : Number(weight);
+    const parsedRpe = rpe.trim() === "" ? undefined : Number(rpe);
+
+    const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
+    if (selectedMovementRecord?.type === "BODYWEIGHT" && !bodyWeightSeries.length && parsedWeight === undefined) {
+      setSetFormError("Record bodyweight first or enter an explicit weight for bodyweight movements.");
+      return;
+    }
+
+    const parsed = addSetInputSchema.safeParse({
       movementId: selectedMovement,
-      reps: parseInt(reps),
-      weight: parseInt(weight),
+      reps: parsedReps,
+      weight: parsedWeight,
+      rpe: parsedRpe,
+      notes: notes.trim() || undefined,
     });
+
+    if (!parsed.success) {
+      setSetFormError(parsed.error.issues[0]?.message ?? "Invalid set values.");
+      return;
+    }
+
+    addSetMutation.mutate(parsed.data);
+  };
+
+  const handleInlineSave = (setId: string, version: number) => {
+    const parsedReps = Number(reps);
+    const parsedWeight = weight.trim() === "" ? undefined : Number(weight);
+    const parsedRpe = rpe.trim() === "" ? null : Number(rpe);
+
+    const parsed = updateSetInputSchema.safeParse({
+      setId,
+      reps: parsedReps,
+      weight: parsedWeight,
+      rpe: parsedRpe,
+      notes: notes.trim() || null,
+      expectedVersion: version,
+    });
+
+    if (!parsed.success) {
+      setSetFormError(parsed.error.issues[0]?.message ?? "Invalid set values.");
+      return;
+    }
+
+    updateSetMutation.mutate(parsed.data);
+  };
+
+  const canCompleteWorkout = Boolean(workout && workout.sets.length > 0);
+  const restElapsedSeconds =
+    workout?.lastSetLoggedAt != null
+      ? Math.max(0, Math.floor((Date.now() - new Date(workout.lastSetLoggedAt).getTime()) / 1000))
+      : 0;
+  const restTargetReached = Boolean(workout?.lastSetLoggedAt && restElapsedSeconds >= workout.restTargetSeconds);
+
+  const activeUnit = preferences.weightUnit;
+
+  const movementOptions = movements.filter((movement: { archivedAt: Date | null }) => !movement.archivedAt);
+
+  const openEditor = (set: {
+    id: string;
+    reps: number;
+    weight: number;
+    rpe: number | null;
+    notes: string | null;
+  }) => {
+    setEditingSetId(set.id);
+    setReps(String(set.reps));
+    setWeight(String(set.weight));
+    setRpe(set.rpe == null ? "" : String(set.rpe));
+    setNotes(set.notes ?? "");
+    setSetFormError("");
   };
 
   if (!workout) {
@@ -83,6 +216,12 @@ function CurrentWorkoutPage() {
               <Play className="w-4 h-4 mr-2" />
               {createWorkoutMutation.isPending ? "Starting..." : "Start Workout"}
             </Button>
+            {completionSummary && (
+              <p className="text-sm text-emerald-700 mt-4">
+                Last workout: {formatDurationSeconds(completionSummary.durationSeconds)}, {" "}
+                {formatWeight(completionSummary.totalVolumeKg, "kg")} total volume.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -93,11 +232,31 @@ function CurrentWorkoutPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
-        <Button variant="outline" onClick={() => completeWorkoutMutation.mutate()}>
+        <Button
+          variant="outline"
+          onClick={() => completeWorkoutMutation.mutate()}
+          disabled={completeWorkoutMutation.isPending || !canCompleteWorkout}>
           <Check className="w-4 h-4 mr-2" />
           {completeWorkoutMutation.isPending ? "Completing..." : "Complete Workout"}
         </Button>
       </div>
+
+      {setFormError && (
+        <Card>
+          <CardContent className="py-3 text-sm text-red-700">{setFormError}</CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="py-3 text-sm text-slate-700 flex items-center justify-between">
+          <span>
+            Rest timer: {restElapsedSeconds}s / target {workout.restTargetSeconds}s
+          </span>
+          <span className={restTargetReached ? "text-emerald-600 font-semibold" : "text-slate-500"}>
+            {restTargetReached ? "Target reached" : "Keep resting"}
+          </span>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -111,10 +270,10 @@ function CurrentWorkoutPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleAddSet} className="flex gap-2 items-center">
+          <form onSubmit={handleAddSet} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
             <Select value={selectedMovement} onChange={(e) => setSelectedMovement(e.target.value)}>
               <option value="">Select movement</option>
-              {movements.map((m) => (
+              {movementOptions.map((m: { id: string; name: string }) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
@@ -122,10 +281,10 @@ function CurrentWorkoutPage() {
             </Select>
             <Input
               type="number"
-              placeholder="Weight"
+              placeholder={`Weight (${activeUnit})`}
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              className="w-24"
+              className="w-full"
               min={0}
             />
             <Input
@@ -133,39 +292,117 @@ function CurrentWorkoutPage() {
               placeholder="Reps"
               value={reps}
               onChange={(e) => setReps(e.target.value)}
-              className="w-24"
+              className="w-full"
               min={1}
             />
-            <Button type="submit" disabled={!selectedMovement || !reps || !weight} size="sm">
+            <Input
+              type="number"
+              placeholder="RPE (optional)"
+              value={rpe}
+              onChange={(e) => setRpe(e.target.value)}
+              className="w-full"
+              min={1}
+              max={10}
+              step={0.5}
+            />
+            <Input
+              placeholder="Notes (optional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full"
+              maxLength={500}
+            />
+            <Button type="submit" disabled={!selectedMovement || !reps} size="sm">
               <Plus className="w-4 h-4 mr-1" />
               {addSetMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </form>
+
+          {!canCompleteWorkout && (
+            <p className="text-xs text-amber-700">Add at least one set before completing this workout.</p>
+          )}
+
           {workout.sets.length === 0 ? (
             <p className="text-sm text-slate-500">No sets yet. Add exercises to your workout!</p>
           ) : (
             <ul className="space-y-2">
-              {workout.sets.map((set) => (
+              {workout.sets.map((set: {
+                id: string;
+                reps: number;
+                weight: number;
+                weightUnit: "kg" | "lbs";
+                rpe: number | null;
+                notes: string | null;
+                version: number;
+                movement: { name: string };
+              }) => (
                 <li key={set.id} className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
                   <div>
                     <span className="font-medium">{set.movement.name}</span>
                     <span className="text-slate-500 ml-2">
-                      {set.reps} reps × {set.weight} lbs
+                      {set.reps} reps x {formatWeight(set.weight, set.weightUnit)}
                     </span>
+                    {set.rpe != null && <span className="text-slate-500 ml-2">RPE {set.rpe}</span>}
+                    {set.notes && <p className="text-xs text-slate-500 mt-1">{set.notes}</p>}
+                    {editingSetId === set.id && (
+                      <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <Input
+                          type="number"
+                          value={reps}
+                          min={1}
+                          onChange={(event) => setReps(event.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          value={weight}
+                          min={0}
+                          onChange={(event) => setWeight(event.target.value)}
+                        />
+                        <Input type="number" value={rpe} min={1} max={10} step={0.5} onChange={(event) => setRpe(event.target.value)} />
+                        <Input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />
+                        <Button
+                          size="sm"
+                          onClick={() => handleInlineSave(set.id, set.version)}
+                          disabled={updateSetMutation.isPending}>
+                          <Save className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteSetMutation.mutate(set.id)}
-                    className="h-8 w-8 text-slate-400">
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEditor(set)} className="h-8 w-8 text-slate-400">
+                      <PencilLine className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (!confirm("Delete this set?")) return;
+                        deleteSetMutation.mutate(set.id);
+                      }}
+                      className="h-8 w-8 text-slate-400">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      {completionSummary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest Completion Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-slate-700">
+            Duration: {formatDurationSeconds(completionSummary.durationSeconds)}. Total volume: {" "}
+            {formatWeight(completionSummary.totalVolumeKg, "kg")}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

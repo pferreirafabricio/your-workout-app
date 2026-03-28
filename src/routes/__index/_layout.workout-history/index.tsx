@@ -4,12 +4,47 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
 import { Trash2 } from "lucide-react";
-import { workoutHistoryQueryOptions } from "./-queries/workout-history";
+import {
+  bodyWeightHistoryQueryOptions,
+  progressionSeriesQueryOptions,
+  workoutHistoryQueryOptions,
+} from "./-queries/workout-history";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Select } from "@/components/ui/select";
+import { formatDateTime, formatNumber, formatWeight } from "@/lib/utils";
+
+type MovementTuple = [string, string];
+
+type WorkoutSet = {
+  movement: { id: string; name: string };
+  reps: number;
+  weight: number;
+  weightUnit: "kg" | "lbs";
+};
+
+type WorkoutRow = {
+  id: string;
+  completedAt: string | Date | null;
+  sets: WorkoutSet[];
+};
+
+type SeriesPoint = {
+  date: string | Date;
+  value: number;
+};
+
+type BodyWeightPoint = {
+  date: string | Date;
+  weight: number;
+  weightUnit: "kg" | "lbs";
+};
 
 export const Route = createFileRoute("/__index/_layout/workout-history/")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(workoutHistoryQueryOptions());
+    await Promise.all([
+      context.queryClient.ensureQueryData(workoutHistoryQueryOptions()),
+      context.queryClient.ensureQueryData(bodyWeightHistoryQueryOptions()),
+    ]);
   },
   component: WorkoutHistoryPage,
 });
@@ -17,7 +52,14 @@ export const Route = createFileRoute("/__index/_layout/workout-history/")({
 function WorkoutHistoryPage() {
   const queryClient = useQueryClient();
   const { data: workouts } = useSuspenseQuery(workoutHistoryQueryOptions());
+  const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightHistoryQueryOptions());
   const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
+  const [selectedMovementId, setSelectedMovementId] = useState("");
+  const [selectedMetric, setSelectedMetric] = useState<"maxWeight" | "totalReps" | "totalVolume">("maxWeight");
+
+  const { data: progressionSeries = [] } = useSuspenseQuery(
+    progressionSeriesQueryOptions(selectedMovementId, selectedMetric),
+  );
 
   const deleteWorkoutsMutation = useMutation({
     mutationFn: (workoutIds: string[]) => deleteWorkoutsServerFn({ data: { workoutIds } }),
@@ -28,8 +70,12 @@ function WorkoutHistoryPage() {
   });
 
   // Get all unique movements across all workouts
-  const uniqueMovements = Array.from(
-    new Map(workouts.flatMap((w) => w.sets.map((s) => [s.movement.id, s.movement.name]))).entries(),
+  const uniqueMovements: MovementTuple[] = Array.from(
+    new Map(
+      (workouts as WorkoutRow[]).flatMap((w) =>
+        w.sets.map((s): MovementTuple => [s.movement.id, s.movement.name]),
+      ),
+    ).entries(),
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
   const toggleWorkout = (id: string) => {
@@ -48,7 +94,7 @@ function WorkoutHistoryPage() {
     if (selectedWorkouts.size === workouts.length) {
       setSelectedWorkouts(new Set());
     } else {
-      setSelectedWorkouts(new Set(workouts.map((w) => w.id)));
+      setSelectedWorkouts(new Set((workouts as WorkoutRow[]).map((w) => w.id)));
     }
   };
 
@@ -62,6 +108,74 @@ function WorkoutHistoryPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Workout History</h1>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Progression Insights</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm font-medium text-slate-700">Movement</label>
+              <Select value={selectedMovementId} onChange={(event) => setSelectedMovementId(event.target.value)}>
+                <option value="">Select movement</option>
+                {uniqueMovements.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Metric</label>
+              <Select
+                value={selectedMetric}
+                onChange={(event) =>
+                  setSelectedMetric(event.target.value as "maxWeight" | "totalReps" | "totalVolume")
+                }>
+                <option value="maxWeight">Max Weight</option>
+                <option value="totalReps">Total Reps</option>
+                <option value="totalVolume">Total Volume</option>
+              </Select>
+            </div>
+          </div>
+
+          {!selectedMovementId ? (
+            <p className="text-sm text-slate-500">Select a movement to view progression points.</p>
+          ) : progressionSeries.length === 0 ? (
+            <p className="text-sm text-slate-500">No progression points for this selection.</p>
+          ) : (
+            <ul className="space-y-2 text-sm text-slate-700">
+              {(progressionSeries as SeriesPoint[]).map((point) => (
+                <li key={`${point.date}-${point.value}`} className="bg-slate-50 rounded-lg px-3 py-2 flex justify-between">
+                  <span>{formatDateTime(point.date)}</span>
+                  <span className="font-medium">{formatNumber(point.value)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Bodyweight Trend</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {bodyWeightSeries.length === 0 ? (
+            <p className="text-sm text-slate-500">No bodyweight entries yet.</p>
+          ) : (
+            <ul className="space-y-2 text-sm text-slate-700">
+              {(bodyWeightSeries as BodyWeightPoint[]).map((point) => (
+                <li key={`${point.date}-${point.weight}`} className="bg-slate-50 rounded-lg px-3 py-2 flex justify-between">
+                  <span>{formatDateTime(point.date)}</span>
+                  <span className="font-medium">{formatWeight(point.weight, point.weightUnit)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -101,9 +215,9 @@ function WorkoutHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {workouts.map((workout) => {
+                  {(workouts as WorkoutRow[]).map((workout) => {
                     const setsByMovement = new Map<string, typeof workout.sets>();
-                    workout.sets.forEach((set) => {
+                    workout.sets.forEach((set: WorkoutSet) => {
                       const existing = setsByMovement.get(set.movement.id) || [];
                       setsByMovement.set(set.movement.id, [...existing, set]);
                     });
@@ -140,14 +254,14 @@ function WorkoutHistoryPage() {
                               </td>
                             );
                           }
-                          const maxWeight = Math.max(...movementSets.map((s) => s.weight));
+                          const maxWeight = Math.max(...movementSets.map((s: WorkoutSet) => s.weight));
                           const avgReps = Math.round(
-                            movementSets.reduce((sum, s) => sum + s.reps, 0) / movementSets.length,
+                            movementSets.reduce((sum: number, s: WorkoutSet) => sum + s.reps, 0) / movementSets.length,
                           );
                           const numSets = movementSets.length;
                           return (
                             <td key={movementId} className="py-3 px-4 text-right text-slate-600">
-                              {maxWeight} lbs / {avgReps} reps / {numSets} sets
+                              {maxWeight} {movementSets[0].weightUnit} / {avgReps} reps / {numSets} sets
                             </td>
                           );
                         })}

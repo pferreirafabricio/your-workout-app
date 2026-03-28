@@ -1,20 +1,10 @@
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signInServerFn } from "@/lib/auth.server";
-import { getServerSidePrismaClient } from "@/lib/db.server";
-import { configService } from "@/lib/config.server";
-
-const getAllUsersServerFn = createServerFn().handler(async () => {
-  if (configService.getAppConfig().environment === "production") throw new Error("Forbidden!");
-  const prisma = await getServerSidePrismaClient();
-  return prisma.user.findMany({
-    select: { id: true, email: true, name: true, createdAt: true, password: true },
-  });
-});
+import { signInInputSchema } from "@/lib/validation/workout-progression";
 
 export const Route = createFileRoute("/sign-in")({
   beforeLoad: ({ context }) => {
@@ -25,7 +15,7 @@ export const Route = createFileRoute("/sign-in")({
   component: SignInPage,
 });
 
-function SignInPage() {
+export function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,11 +28,22 @@ function SignInPage() {
     setIsLoading(true);
 
     try {
-      const result = await signInServerFn({ data: { email, password } });
+      const parsed = signInInputSchema.safeParse({ email, password, clientSource: "web" });
+      if (!parsed.success) {
+        setError(parsed.error.issues[0]?.message ?? "Invalid sign-in values.");
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await signInServerFn({ data: parsed.data });
       if (result.success) {
         router.navigate({ to: "/" });
+      } else if (result.error === "LOCKED_OUT") {
+        setError(`Too many failed attempts. Try again in ${result.retryAfterSeconds} seconds.`);
+      } else if (result.error === "INVALID_CREDENTIALS") {
+        setError("Invalid email or password");
       } else {
-        setError(result.error || "Sign in failed");
+        setError("Sign in failed");
       }
     } catch {
       setError("An unexpected error occurred");
@@ -102,19 +103,6 @@ function SignInPage() {
               Create one
             </Link>
           </p>
-          {import.meta.env.DEV && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full mt-4 text-xs text-slate-400"
-              onClick={async () => {
-                const users = await getAllUsersServerFn();
-                console.log("All users:", users);
-              }}>
-              [DEV] Print all users to console
-            </Button>
-          )}
         </CardContent>
       </Card>
     </div>
