@@ -74,6 +74,22 @@ bun run test -- e2e/workouts.spec.ts e2e/nutrition.spec.ts
 - Refresh/revisit dashboard and confirm same-session filter behavior remains understandable.
 - Verify charts render clearly on mobile and desktop widths.
 
+### Functional Requirement Verification (FR-001 to FR-014)
+- [ ] FR-001 Home dashboard shows movement performance chart module with movement + metric controls.
+- [ ] FR-002 Movement metric selector supports exactly maxWeight, totalReps, totalVolume.
+- [ ] FR-003 Movement chart values are aggregated by day for selected movement.
+- [ ] FR-004 Maximum weight equals highest set weight per selected day.
+- [ ] FR-005 Total reps equals sum of reps across selected movement sets per day.
+- [ ] FR-006 Total volume equals sum of reps * weight across selected movement sets per day.
+- [ ] FR-007 Movement chart plots chronological daily points and readable tooltips.
+- [ ] FR-008 Home dashboard includes nutrition trend charting with metric selector.
+- [ ] FR-009 Nutrition selector supports at least calories, protein, bodyweight.
+- [ ] FR-010 Both movement and nutrition charts support date-range filtering.
+- [ ] FR-011 Both charts show non-error empty states when no data exists.
+- [ ] FR-012 Chart labels and tooltips clearly identify metric and unit.
+- [ ] FR-013 Dashboard data is scoped to the signed-in user only.
+- [ ] FR-014 Dashboard reflects fresh data after logging workouts/nutrition and revisiting/refreshing.
+
 ## 7. Definition of done
 - Plan/research/design artifacts completed for feature 004.
 - Dashboard route behavior satisfies FR-001 through FR-014 scope.

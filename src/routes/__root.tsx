@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NotFound } from "@/components/NotFound";
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -74,7 +75,7 @@ ${error.stack || "No stack trace available"}`;
                   {error.stack && (
                     <details className="mt-2" open>
                       <summary className="cursor-pointer text-sm font-medium">Stack trace</summary>
-                      <pre className="mt-2 text-xs overflow-x-auto bg-red-100 p-2 rounded whitespace-pre-wrap break-words max-w-full">
+                      <pre className="mt-2 text-xs overflow-x-auto bg-red-100 p-2 rounded whitespace-pre-wrap wrap-break-word max-w-full">
                         {error.stack}
                       </pre>
                     </details>
@@ -118,6 +119,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     return { user };
   },
   errorComponent: RootErrorComponent,
+  notFoundComponent: NotFound,
   head: () => ({
     meta: [
       {
@@ -172,7 +174,7 @@ function RootDocument({ children }: Readonly<{ children: React.ReactNode }>) {
       <head>
         <HeadContent />
       </head>
-      <body className="overflow-x-hidden font-sans antialiased text-slate-900 bg-[radial-gradient(circle_at_top,_#e8f5f9_0%,_#f4f9fb_36%,_#ffffff_70%)]">
+      <body className="overflow-x-hidden font-sans antialiased text-slate-900 bg-[radial-gradient(circle_at_top,#e8f5f9_0%,#f4f9fb_36%,#ffffff_70%)]">
         <TooltipProvider>
           {children}
         </TooltipProvider>

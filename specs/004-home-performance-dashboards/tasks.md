@@ -11,10 +11,10 @@
 
 **Purpose**: Align dependencies, test entry points, and feature docs for dashboard work.
 
-- [ ] T001 Confirm Recharts dependency and lockfile integrity in package.json and bun.lock
-- [ ] T002 [P] Add dashboard route test scaffold in src/routes/__index/_layout.index.test.tsx
-- [ ] T003 [P] Add dashboard Playwright helpers for chart selectors and tooltips in e2e/helpers/dashboard.ts
-- [ ] T004 Add dashboard verification checklist section for FR-001 through FR-014 in specs/004-home-performance-dashboards/quickstart.md
+- [x] T001 Confirm Recharts dependency and lockfile integrity in package.json and bun.lock
+- [x] T002 [P] Add dashboard route test scaffold in src/routes/__index/-_layout.index.test.tsx
+- [x] T003 [P] Add dashboard Playwright helpers for chart selectors and tooltips in e2e/helpers/dashboard.ts
+- [x] T004 Add dashboard verification checklist section for FR-001 through FR-014 in specs/004-home-performance-dashboards/quickstart.md
 
 ---
 
@@ -24,13 +24,13 @@
 
 **CRITICAL**: Complete this phase before starting user story phases.
 
-- [ ] T005 Create movement and nutrition metric metadata map with units in src/routes/__index/-dashboard/metrics.ts
-- [ ] T006 [P] Create movement and nutrition chart point mappers in src/routes/__index/-dashboard/series-mappers.ts
-- [ ] T007 [P] Create date-range normalization and validation helpers in src/routes/__index/-dashboard/date-range.ts
-- [ ] T008 Create home dashboard query options module in src/routes/__index/-dashboard/queries.ts
-- [ ] T009 Refactor home dashboard route to consume shared dashboard helpers in src/routes/__index/_layout.index.tsx
-- [ ] T010 Add foundational unit tests for shared helpers in src/routes/__index/-dashboard/metrics.test.ts
-- [ ] T011 [P] Add foundational unit tests for mapper/date-range helpers in src/routes/__index/-dashboard/series-mappers.test.ts
+- [x] T005 Create movement and nutrition metric metadata map with units in src/routes/__index/-dashboard/metrics.ts
+- [x] T006 [P] Create movement and nutrition chart point mappers in src/routes/__index/-dashboard/series-mappers.ts
+- [x] T007 [P] Create date-range normalization and validation helpers in src/routes/__index/-dashboard/date-range.ts
+- [x] T008 Create home dashboard query options module in src/routes/__index/-dashboard/queries.ts
+- [x] T009 Refactor home dashboard route to consume shared dashboard helpers in src/routes/__index/_layout.index.tsx
+- [x] T010 Add foundational unit tests for shared helpers in src/routes/__index/-dashboard/metrics.test.ts
+- [x] T011 [P] Add foundational unit tests for mapper/date-range helpers in src/routes/__index/-dashboard/series-mappers.test.ts
 
 **Checkpoint**: Shared dashboard foundation complete and stable.
 
@@ -44,19 +44,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add unit tests for movement metric label and unit rendering in src/routes/__index/-dashboard/metrics.test.ts
-- [ ] T013 [P] [US1] Add unit tests for movement series ordering and value mapping in src/routes/__index/-dashboard/series-mappers.test.ts
+- [x] T012 [P] [US1] Add unit tests for movement metric label and unit rendering in src/routes/__index/-dashboard/metrics.test.ts
+- [x] T013 [P] [US1] Add unit tests for movement series ordering and value mapping in src/routes/__index/-dashboard/series-mappers.test.ts
 - [ ] T014 [US1] Add integration test for movement selector and metric switching behavior in src/routes/__index/_layout.index.test.tsx
-- [ ] T015 [US1] Extend progression metric formula tests for maxWeight/totalReps/totalVolume in src/lib/features/workouts/workout-progression.test.ts
+- [x] T015 [US1] Extend progression metric formula tests for maxWeight/totalReps/totalVolume in src/lib/features/workouts/workouts.server.test.ts
 - [ ] T016 [US1] Add e2e test for movement chart metric switching and tooltip updates in e2e/workouts.spec.ts
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Enforce movement metric options and selector wiring in src/routes/__index/_layout.index.tsx
-- [ ] T018 [US1] Wire movement chart series query to date-range state in src/routes/__index/_layout.index.tsx
-- [ ] T019 [US1] Add movement chart title, axis, and tooltip unit clarity in src/routes/__index/_layout.index.tsx
-- [ ] T020 [US1] Implement movement chart empty-state and no-movement fallback behavior in src/routes/__index/_layout.index.tsx
-- [ ] T021 [US1] Tune movement chart gradient styling and responsive behavior in src/routes/__index/_layout.index.tsx
+- [x] T017 [US1] Enforce movement metric options and selector wiring in src/routes/__index/_layout.index.tsx
+- [x] T018 [US1] Wire movement chart series query to date-range state in src/routes/__index/_layout.index.tsx
+- [x] T019 [US1] Add movement chart title, axis, and tooltip unit clarity in src/routes/__index/_layout.index.tsx
+- [x] T020 [US1] Implement movement chart empty-state and no-movement fallback behavior in src/routes/__index/_layout.index.tsx
+- [x] T021 [US1] Tune movement chart gradient styling and responsive behavior in src/routes/__index/_layout.index.tsx
 
 **Checkpoint**: MVP complete and independently testable.
 

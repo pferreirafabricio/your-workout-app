@@ -1,6 +1,7 @@
 import { forwardRef, type ReactNode } from "react";
 import { ArrowLeft, Loader2, PencilLine, Plus, Save, Send, Trash2, X } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { cn } from "@/lib/shared/utils";
 
 type ActionButtonProps = ButtonProps & {
   isLoading?: boolean;
@@ -8,21 +9,23 @@ type ActionButtonProps = ButtonProps & {
   children?: ReactNode;
 };
 
+const ACTION_BUTTON_CN = "min-w-[120px] justify-center";
+
 const SaveButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
-  ({ isLoading = false, loadingText = "loading...", children = "Save", disabled, ...props }, ref) => (
-    <Button ref={ref} disabled={disabled || isLoading} {...props}>
+  ({ isLoading = false, loadingText = "Loading...", children = "Save", disabled, className, ...props }, ref) => (
+    <Button ref={ref} disabled={disabled || isLoading} className={cn(ACTION_BUTTON_CN, className)} {...props}>
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-      {isLoading ? loadingText : children}
+      <span>{isLoading ? loadingText : children}</span>
     </Button>
   ),
 );
 SaveButton.displayName = "SaveButton";
 
 const AddButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
-  ({ isLoading = false, loadingText = "loading...", children = "Add", disabled, ...props }, ref) => (
-    <Button ref={ref} disabled={disabled || isLoading} {...props}>
+  ({ isLoading = false, loadingText = "Loading...", children = "Add", disabled, className, ...props }, ref) => (
+    <Button ref={ref} disabled={disabled || isLoading} className={cn(ACTION_BUTTON_CN, className)} {...props}>
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-      {isLoading ? loadingText : children}
+      <span>{isLoading ? loadingText : children}</span>
     </Button>
   ),
 );
@@ -33,12 +36,13 @@ type DeleteButtonProps = ActionButtonProps & {
 };
 
 const DeleteButton = forwardRef<HTMLButtonElement, DeleteButtonProps>(
-  ({ iconOnly = false, isLoading = false, loadingText = "loading...", children = "Delete", disabled, ...props }, ref) => {
+  ({ iconOnly = false, isLoading = false, loadingText = "Deleting...", children = "Delete", disabled, className, ...props }, ref) => {
     if (iconOnly) {
       return (
         <Button
           ref={ref}
           disabled={disabled || isLoading}
+          className={className}
           aria-label={typeof children === "string" ? children : "Delete"}
           {...props}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -47,9 +51,9 @@ const DeleteButton = forwardRef<HTMLButtonElement, DeleteButtonProps>(
     }
 
     return (
-      <Button ref={ref} disabled={disabled || isLoading} {...props}>
+      <Button ref={ref} disabled={disabled || isLoading} className={cn(ACTION_BUTTON_CN, className)} {...props}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        {isLoading ? loadingText : children}
+        <span>{isLoading ? loadingText : children}</span>
       </Button>
     );
   },
@@ -77,9 +81,9 @@ const EditButton = forwardRef<HTMLButtonElement, EditButtonProps>(
     }
 
     return (
-      <Button ref={ref} variant={variant} size={size} className={className} {...props}>
+      <Button ref={ref} variant={variant} size={size} className={cn(ACTION_BUTTON_CN, className)} {...props}>
         <PencilLine className="h-4 w-4" />
-        {children}
+        <span>{children}</span>
       </Button>
     );
   },
@@ -91,13 +95,13 @@ type SubmitButtonProps = ActionButtonProps & {
 };
 
 const SubmitButton = forwardRef<HTMLButtonElement, SubmitButtonProps>(
-  ({ icon = "send", isLoading = false, loadingText = "loading...", children = "Submit", disabled, ...props }, ref) => {
+  ({ icon = "send", isLoading = false, loadingText = "Loading...", children = "Submit", disabled, className, ...props }, ref) => {
     const Icon = icon === "save" ? Save : Send;
 
     return (
-      <Button ref={ref} type="submit" disabled={disabled || isLoading} {...props}>
+      <Button ref={ref} type="submit" disabled={disabled || isLoading} className={cn(ACTION_BUTTON_CN, className)} {...props}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-        {isLoading ? loadingText : children}
+        <span>{isLoading ? loadingText : children}</span>
       </Button>
     );
   },
@@ -105,24 +109,25 @@ const SubmitButton = forwardRef<HTMLButtonElement, SubmitButtonProps>(
 SubmitButton.displayName = "SubmitButton";
 
 const CancelButton = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children = "Cancel", ...props }, ref) => (
-    <Button ref={ref} {...props}>
+  ({ children = "Cancel", className, ...props }, ref) => (
+    <Button ref={ref} className={cn(ACTION_BUTTON_CN, className)} {...props}>
       <X className="h-4 w-4" />
-      {children}
+      <span>{children}</span>
     </Button>
   ),
 );
 CancelButton.displayName = "CancelButton";
 
 const BackButton = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children = "Back", ...props }, ref) => (
-    <Button ref={ref} {...props}>
+  ({ children = "Back", className, ...props }, ref) => (
+    <Button ref={ref} className={cn(ACTION_BUTTON_CN, className)} {...props}>
       <ArrowLeft className="h-4 w-4" />
-      {children}
+      <span>{children}</span>
     </Button>
   ),
 );
 BackButton.displayName = "BackButton";
+
 
 export { AddButton, BackButton, CancelButton, DeleteButton, EditButton, SaveButton, SubmitButton };
 export type { ActionButtonProps };

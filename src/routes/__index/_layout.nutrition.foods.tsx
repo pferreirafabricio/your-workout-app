@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { AddButton, CancelButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import {
   createNutritionFoodServerFn,
@@ -270,20 +270,25 @@ function NutritionFoodsPage() {
               />
             </div>
             <div className="flex items-end gap-2">
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="w-full">
-                {editingFoodId ? "Save Changes" : "Create Food"}
-              </Button>
               {editingFoodId ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setEditingFoodId(null);
-                    setForm(EMPTY_FOOD);
-                  }}>
-                  Cancel
-                </Button>
-              ) : null}
+                <>
+                  <SaveButton type="submit" isLoading={updateMutation.isPending} className="w-full">
+                    Save Changes
+                  </SaveButton>
+                  <CancelButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingFoodId(null);
+                      setForm(EMPTY_FOOD);
+                    }}
+                  />
+                </>
+              ) : (
+                <AddButton type="submit" isLoading={createMutation.isPending} className="w-full">
+                  Create Food
+                </AddButton>
+              )}
             </div>
           </form>
         </CardContent>
@@ -320,17 +325,22 @@ function NutritionFoodsPage() {
                     <td className="px-3 py-2">{food.fatsG}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => onEdit(food)}>
-                          Edit
-                        </Button>
-                        <Button
+                        <EditButton
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          iconOnly
+                          onClick={() => onEdit(food)}
+                        />
+                        <DeleteButton
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          iconOnly
                           disabled={deleteMutation.isPending}
-                          onClick={() => deleteMutation.mutate(food.id)}>
-                          Delete
-                        </Button>
+                          isLoading={deleteMutation.isPending}
+                          onClick={() => deleteMutation.mutate(food.id)}
+                        />
                       </div>
                     </td>
                   </tr>

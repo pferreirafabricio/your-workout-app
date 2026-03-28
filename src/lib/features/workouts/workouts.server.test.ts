@@ -76,6 +76,34 @@ describe("workouts server helpers", () => {
     expect(series[0]?.value).toBe(1120);
   });
 
+  it("aggregates total reps by calendar day", () => {
+    const series = buildProgressionSeries(
+      [
+        { loggedAt: new Date("2026-03-05T08:00:00.000Z"), reps: 5, weightSnapshotKg: 70 },
+        { loggedAt: new Date("2026-03-05T09:00:00.000Z"), reps: 7, weightSnapshotKg: 75 },
+        { loggedAt: new Date("2026-03-06T09:00:00.000Z"), reps: 4, weightSnapshotKg: 80 },
+      ],
+      "totalReps",
+    );
+
+    expect(series).toEqual([
+      { date: "2026-03-05", value: 12 },
+      { date: "2026-03-06", value: 4 },
+    ]);
+  });
+
+  it("aggregates total volume by calendar day with rounding", () => {
+    const series = buildProgressionSeries(
+      [
+        { loggedAt: new Date("2026-03-07T08:00:00.000Z"), reps: 5, weightSnapshotKg: 82.55 },
+        { loggedAt: new Date("2026-03-07T09:00:00.000Z"), reps: 3, weightSnapshotKg: 90.25 },
+      ],
+      "totalVolume",
+    );
+
+    expect(series).toEqual([{ date: "2026-03-07", value: 683.5 }]);
+  });
+
   it("groups progression points by user timezone calendar day", () => {
     const series = buildProgressionSeries(
       [

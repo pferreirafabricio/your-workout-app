@@ -5,7 +5,7 @@ import { Archive, ArchiveRestore, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { AddButton, CancelButton, SaveButton } from "@/components/ui/action-buttons";
+import { AddButton, CancelButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   createEquipmentServerFn,
@@ -200,7 +200,6 @@ function EquipmentPage() {
     activeStateMutation.mutate(parsed.data);
   };
 
-  const isBusy = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -258,11 +257,11 @@ function EquipmentPage() {
 
             <div className="flex gap-2">
               {editingId ? (
-                <SaveButton type="submit" disabled={isBusy} isLoading={updateMutation.isPending} loadingText="loading...">
+                <SaveButton type="submit" isLoading={updateMutation.isPending} loadingText="Saving...">
                   Save
                 </SaveButton>
               ) : (
-                <AddButton type="submit" disabled={isBusy} isLoading={createMutation.isPending} loadingText="loading...">
+                <AddButton type="submit" isLoading={createMutation.isPending} loadingText="Creating...">
                   Create
                 </AddButton>
               )}
@@ -297,9 +296,9 @@ function EquipmentPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button type="button" size="sm" variant="ghost" onClick={() => beginEdit(row)}>
+                    <EditButton type="button" size="sm" variant="ghost" onClick={() => beginEdit(row)} iconOnly={false}>
                       Edit
-                    </Button>
+                    </EditButton>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setPendingToggleTarget(row)}>
                       {row.isActive ? (
                         <>
