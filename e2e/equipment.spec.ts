@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createAccountAndSignIn } from "./helpers/auth";
+
 
 test.describe("Equipment", () => {
   test("loads equipment page and can create equipment", async ({ page }) => {
@@ -18,11 +18,12 @@ test.describe("Equipment", () => {
     await expect(page.getByText(`code: ${code}`)).toBeVisible();
   });
 
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test("redirects unauthenticated users to sign-in", async ({ page }) => {
+  test("redirects unauthenticated users to sign-in", async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
     await page.goto("/equipment");
     await expect(page).toHaveURL(/\/sign-in/);
+    await context.close();
   });
 
   test("surfaces safe error state when csrf token is invalid", async ({ page }) => {
