@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Plus, Save, X } from "lucide-react";
+import { Archive, ArchiveRestore, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AddButton, CancelButton, SaveButton } from "@/components/ui/action-buttons";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   createEquipmentServerFn,
@@ -256,15 +257,19 @@ function EquipmentPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button type="submit" disabled={isBusy} className="gap-2">
-                {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {editingId ? "Save" : "Create"}
-              </Button>
               {editingId ? (
-                <Button type="button" variant="ghost" onClick={cancelEdit} className="gap-2">
-                  <X className="h-4 w-4" />
+                <SaveButton type="submit" disabled={isBusy} isLoading={updateMutation.isPending} loadingText="loading...">
+                  Save
+                </SaveButton>
+              ) : (
+                <AddButton type="submit" disabled={isBusy} isLoading={createMutation.isPending} loadingText="loading...">
+                  Create
+                </AddButton>
+              )}
+              {editingId ? (
+                <CancelButton type="button" variant="ghost" onClick={cancelEdit}>
                   Cancel
-                </Button>
+                </CancelButton>
               ) : null}
             </div>
           </form>

@@ -16,7 +16,7 @@ import {
   updateSetServerFn,
   deleteSetServerFn,
 } from "@/lib/features/workouts/workouts.server";
-import { Play, Check, X, ArrowUp, ArrowDown, CircleDot, Minus, Plus } from "lucide-react";
+import { Play, Check, X, ArrowUp, ArrowDown, CircleDot, Minus, Plus, Loader2 } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   bodyWeightSeriesQueryOptions,
@@ -554,7 +554,7 @@ function CurrentWorkoutPage() {
                         }
                         disabled={queueMutationIsPending || queueItem.targetSets <= 1}
                         aria-label="Decrease target sets">
-                        <Minus className="h-4 w-4" />
+                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Minus className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -567,7 +567,7 @@ function CurrentWorkoutPage() {
                         }
                         disabled={queueMutationIsPending || queueItem.targetSets >= 12}
                         aria-label="Increase target sets">
-                        <Plus className="h-4 w-4" />
+                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -575,7 +575,7 @@ function CurrentWorkoutPage() {
                         onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "up" })}
                         disabled={queueMutationIsPending || index === 0}
                         aria-label="Move up">
-                        <ArrowUp className="h-4 w-4" />
+                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -583,14 +583,14 @@ function CurrentWorkoutPage() {
                         onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "down" })}
                         disabled={queueMutationIsPending || index === workout.queue.length - 1}
                         aria-label="Move down">
-                        <ArrowDown className="h-4 w-4" />
+                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant={isActive ? "secondary" : "outline"}
                         size="sm"
                         onClick={() => activateQueueMovementMutation.mutate(queueItem.movementId)}
                         disabled={queueMutationIsPending || isActive}>
-                        {isActive ? "Active" : "Set Active"}
+                        {queueMutationIsPending ? "loading..." : isActive ? "Active" : "Set Active"}
                       </Button>
                       <Button
                         variant="outline"
@@ -602,8 +602,14 @@ function CurrentWorkoutPage() {
                           })
                         }
                         disabled={queueMutationIsPending}>
-                        {queueItem.isSkipped ? "Unskip" : "Skip"}
+                        {queueMutationIsPending ? "loading..." : queueItem.isSkipped ? "Unskip" : "Skip"}
                       </Button>
+                      {queueMutationIsPending ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-slate-500" aria-live="polite">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          loading...
+                        </span>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -724,7 +730,9 @@ function CurrentWorkoutPage() {
                         <SaveButton
                           size="sm"
                           onClick={() => handleInlineSave(set.id, set.version)}
-                          disabled={updateSetMutation.isPending}>
+                          disabled={updateSetMutation.isPending}
+                          isLoading={updateSetMutation.isPending}
+                          loadingText="loading...">
                           Save
                         </SaveButton>
                       </div>
