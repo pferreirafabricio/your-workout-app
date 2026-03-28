@@ -57,6 +57,10 @@ function CurrentWorkoutPage() {
     totalVolumeKg: number;
   } | null>(null);
 
+  const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
+  const isSelectedMovementBodyweight = selectedMovementRecord?.type === "BODYWEIGHT";
+  const latestBodyWeight = bodyWeightSeries.at(-1) ?? null;
+
   const createWorkoutMutation = useMutation({
     mutationFn: () => createWorkoutServerFn({ headers: getCsrfHeaders() }),
     onSuccess: () => {
@@ -153,9 +157,8 @@ function CurrentWorkoutPage() {
     const parsedWeight = weight.trim() === "" ? undefined : Number(weight);
     const parsedRpe = rpe.trim() === "" ? undefined : Number(rpe);
 
-    const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
-    if (selectedMovementRecord?.type === "BODYWEIGHT" && !bodyWeightSeries.length && parsedWeight === undefined) {
-      const message = "Record bodyweight first or enter an explicit weight for bodyweight movements.";
+    if (isSelectedMovementBodyweight && !bodyWeightSeries.length && parsedWeight === undefined) {
+      const message = "Record bodyweight first before adding a bodyweight set.";
       setSetFormError(message);
       toast.error(message);
       return;
@@ -205,14 +208,37 @@ function CurrentWorkoutPage() {
 
   const canCompleteWorkout = Boolean(workout && workout.sets.length > 0);
   const restElapsedSeconds =
-    workout?.lastSetLoggedAt != null
+    workout?.lastSetLoggedAt
       ? Math.max(0, Math.floor((Date.now() - new Date(workout.lastSetLoggedAt).getTime()) / 1000))
       : 0;
   const restTargetReached = Boolean(workout?.lastSetLoggedAt && restElapsedSeconds >= workout.restTargetSeconds);
 
   const activeUnit = preferences.weightUnit;
+  let weightPlaceholder = `Weight (${activeUnit})`;
+  if (isSelectedMovementBodyweight) {
+    weightPlaceholder = latestBodyWeight
+      ? `Weight (${activeUnit}) auto-filled from latest bodyweight`
+      : "Record bodyweight first in Settings";
+  }
 
   const movementOptions = movements.filter((movement: { archivedAt: Date | null }) => !movement.archivedAt);
+
+  const handleMovementChange = (movementId: string) => {
+    setSelectedMovement(movementId);
+    setSetFormError("");
+
+    const movement = movements.find((item: { id: string; type: string }) => item.id === movementId);
+    if (movement?.type === "BODYWEIGHT") {
+      if (latestBodyWeight) {
+        setWeight(String(latestBodyWeight.weight));
+      } else {
+        setWeight("");
+      }
+      return;
+    }
+
+    setWeight("");
+  };
 
   const openEditor = (set: {
     id: string;
@@ -311,7 +337,7 @@ function CurrentWorkoutPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleAddSet} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
-            <Select value={selectedMovement} onChange={(e) => setSelectedMovement(e.target.value)}>
+            <Select value={selectedMovement} onChange={(e) => handleMovementChange(e.target.value)}>
               <option value="">Select movement</option>
               {movementOptions.map((m: { id: string; name: string }) => (
                 <option key={m.id} value={m.id}>
@@ -321,11 +347,12 @@ function CurrentWorkoutPage() {
             </Select>
             <Input
               type="number"
-              placeholder={`Weight (${activeUnit})`}
+              placeholder={weightPlaceholder}
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               className="w-full"
               min={0}
+              disabled={isSelectedMovementBodyweight}
             />
             <Input
               type="number"

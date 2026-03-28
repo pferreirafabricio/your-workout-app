@@ -12,7 +12,7 @@ import { formatDateTime, formatWeight } from "@/lib/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/__index/")({
+export const Route = createFileRoute("/__index/_layout/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(userPreferencesQueryOptions()),
