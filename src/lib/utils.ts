@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { WeightUnit } from "@/lib/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -94,4 +95,59 @@ export function stringSimilarity(str1: string, str2: string): number {
   const similarity = ((maxLength - distance) / maxLength) * 100;
 
   return Math.round(similarity * 100) / 100; // Round to 2 decimal places
+}
+
+export const KG_PER_LB = 0.45359237;
+
+export function roundWeight(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export function lbsToKg(lbs: number): number {
+  return roundWeight(lbs * KG_PER_LB);
+}
+
+export function kgToLbs(kg: number): number {
+  return roundWeight(kg / KG_PER_LB);
+}
+
+export function toCanonicalKg(value: number, unit: WeightUnit): number {
+  return unit === "kg" ? roundWeight(value) : lbsToKg(value);
+}
+
+export function fromCanonicalKg(valueKg: number, unit: WeightUnit): number {
+  return unit === "kg" ? roundWeight(valueKg) : kgToLbs(valueKg);
+}
+
+export function formatWeight(value: number, unit: WeightUnit, fractionDigits = 1): string {
+  return `${value.toFixed(fractionDigits)} ${unit}`;
+}
+
+export function formatDateTime(value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatDurationSeconds(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
