@@ -156,3 +156,14 @@ The onboarding app **does not handle Stripe webhooks**. Subscription status upda
 - Development container runs on port 3200 (maps to internal port 3000)
 - Uses user ID/group ID mapping for file permissions
 - Volume mounts ensure local development experience with Docker benefits
+- The app container runs `bun install --frozen-lockfile` on startup to keep the named `node_modules` volume in sync with `package.json` and `bun.lock`
+
+### Docker Dependency Recovery
+
+If you hit runtime errors like `Cannot find module 'bcryptjs' imported from '/app/src/lib/auth.server.ts'`:
+
+1. Stop the stack: `docker compose -f docker-compose.dev.yml down`
+2. Reset dependencies and restart: `./scripts/dev.sh up --reset-deps`
+3. Verify module presence: `docker exec -it demo-project sh -lc 'ls node_modules/bcryptjs'`
+
+Use `--reset-deps` whenever dependency or lockfile changes seem out of sync with the running container.
