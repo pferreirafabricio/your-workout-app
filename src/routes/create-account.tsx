@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ export const Route = createFileRoute("/create-account")({
 });
 
 function CreateAccountPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +43,8 @@ function CreateAccountPage() {
 
       const result = await createAccountServerFn({ data: parsed.data });
       if (result.success) {
-        router.navigate({ to: "/" });
+        window.location.assign("/current-workout");
+        return;
       } else {
         setError(result.error || "Account creation failed");
       }

@@ -47,6 +47,9 @@ services:
       target: development
     ports:
       - ${PORT:-3000}:${PORT:-3000}
+    volumes:
+      - ./:/app
+      - demo_bun_node_modules:/app/node_modules
     develop:
       watch:
         - action: sync
@@ -63,3 +66,4 @@ networks:
 
 volumes:
   demo_postgres_data:
+  demo_bun_node_modules:

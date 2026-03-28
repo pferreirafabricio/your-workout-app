@@ -9,7 +9,7 @@ import {
   progressionSeriesQueryOptions,
   workoutHistoryQueryOptions,
 } from "./-queries/workout-history";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Select } from "@/components/ui/select";
 import { formatDateTime, formatNumber, formatWeight } from "@/lib/utils";
 
@@ -57,7 +57,7 @@ function WorkoutHistoryPage() {
   const [selectedMovementId, setSelectedMovementId] = useState("");
   const [selectedMetric, setSelectedMetric] = useState<"maxWeight" | "totalReps" | "totalVolume">("maxWeight");
 
-  const { data: progressionSeries = [] } = useSuspenseQuery(
+  const { data: progressionSeries = [] } = useQuery(
     progressionSeriesQueryOptions(selectedMovementId, selectedMetric),
   );
 

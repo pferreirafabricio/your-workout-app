@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ export const Route = createFileRoute("/sign-in")({
 });
 
 export function SignInPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,7 +36,8 @@ export function SignInPage() {
 
       const result = await signInServerFn({ data: parsed.data });
       if (result.success) {
-        router.navigate({ to: "/" });
+        window.location.assign("/current-workout");
+        return;
       } else if (result.error === "LOCKED_OUT") {
         setError(`Too many failed attempts. Try again in ${result.retryAfterSeconds} seconds.`);
       } else if (result.error === "INVALID_CREDENTIALS") {
