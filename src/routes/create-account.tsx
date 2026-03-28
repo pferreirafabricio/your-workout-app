@@ -1,15 +1,18 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { createAccountServerFn } from "@/lib/auth.server";
 import { z } from "zod";
+import { getCsrfHeaders } from "@/lib/csrf.client";
+import { strongPasswordSchema } from "@/lib/validation/workout-progression";
+import { LogIn } from "lucide-react";
 
 const createAccountInputSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   name: z.string().trim().min(1).max(120),
-  password: z.string().min(8).max(256),
+  password: strongPasswordSchema,
 });
 
 export const Route = createFileRoute("/create-account")({
@@ -41,9 +44,9 @@ function CreateAccountPage() {
         return;
       }
 
-      const result = await createAccountServerFn({ data: parsed.data });
+      const result = await createAccountServerFn({ data: parsed.data, headers: getCsrfHeaders() });
       if (result.success) {
-        window.location.assign("/current-workout");
+        globalThis.location.assign("/current-workout");
         return;
       } else {
         setError(result.error || "Account creation failed");
@@ -110,16 +113,23 @@ function CreateAccountPage() {
                 minLength={8}
                 autoComplete="new-password"
               />
-              <p className="text-xs text-gray-500">Must be at least 8 characters</p>
+              <p className="text-xs text-gray-500">8+ chars with uppercase, lowercase, number, and symbol</p>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Create account"}
-            </Button>
+            <SubmitButton
+              className="w-full"
+              disabled={isLoading}
+              isLoading={isLoading}
+              loadingText="Creating account...">
+              Create account
+            </SubmitButton>
           </form>
           <p className="mt-4 text-center text-sm text-gray-500">
             Already have an account?{" "}
             <Link to="/sign-in" className="text-primary hover:underline font-medium">
-              Sign in
+              <span className="inline-flex items-center gap-1">
+                <LogIn className="h-4 w-4" />
+                Sign in
+              </span>
             </Link>
           </p>
         </CardContent>

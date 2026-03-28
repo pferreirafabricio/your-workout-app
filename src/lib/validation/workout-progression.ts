@@ -18,6 +18,15 @@ export const mutationErrorMessages = {
   lockout: "Too many failed sign-in attempts. Please wait before trying again.",
 } as const;
 
+export const strongPasswordSchema = z
+  .string()
+  .min(8)
+  .max(256)
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,256}$/, {
+    message:
+      "Password must include uppercase, lowercase, number, and special character.",
+  });
+
 const isoDate = z
   .string()
   .datetime({ offset: true })

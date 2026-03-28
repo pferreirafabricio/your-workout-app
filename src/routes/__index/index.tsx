@@ -2,13 +2,14 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { SaveButton, SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "./_layout.current-workout/-queries/current-workout";
 import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/workouts.server";
 import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/validation/workout-progression";
 import { formatDateTime, formatWeight } from "@/lib/utils";
+import { getCsrfHeaders } from "@/lib/csrf.client";
 
 export const Route = createFileRoute("/__index/")({
   loader: async ({ context }) => {
@@ -32,7 +33,7 @@ function IndexPage() {
 
   const preferencesMutation = useMutation({
     mutationFn: (payload: { weightUnit: "kg" | "lbs"; defaultRestTargetSeconds: number | null }) =>
-      setUserPreferencesServerFn({ data: payload }),
+      setUserPreferencesServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setError("Could not save preferences.");
@@ -46,7 +47,7 @@ function IndexPage() {
 
   const bodyWeightMutation = useMutation({
     mutationFn: (payload: { weight: number; unit: "kg" | "lbs"; recordedAt?: string }) =>
-      recordBodyWeightServerFn({ data: payload }),
+      recordBodyWeightServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setError("Could not record body weight.");
@@ -119,9 +120,9 @@ function IndexPage() {
               <label className="text-sm font-medium text-slate-700">Default rest target (seconds)</label>
               <Input type="number" min={15} max={600} value={restTarget} onChange={(event) => setRestTarget(event.target.value)} />
             </div>
-            <Button type="submit" disabled={preferencesMutation.isPending}>
-              {preferencesMutation.isPending ? "Saving..." : "Save Preferences"}
-            </Button>
+            <SaveButton type="submit" disabled={preferencesMutation.isPending} isLoading={preferencesMutation.isPending}>
+              Save Preferences
+            </SaveButton>
           </form>
         </CardContent>
       </Card>
@@ -142,9 +143,14 @@ function IndexPage() {
                 onChange={(event) => setBodyWeight(event.target.value)}
               />
             </div>
-            <Button type="submit" disabled={bodyWeightMutation.isPending || !bodyWeight.trim()}>
-              {bodyWeightMutation.isPending ? "Saving..." : "Record"}
-            </Button>
+            <SubmitButton
+              type="submit"
+              icon="save"
+              disabled={bodyWeightMutation.isPending || !bodyWeight.trim()}
+              isLoading={bodyWeightMutation.isPending}
+              loadingText="Saving...">
+              Record
+            </SubmitButton>
           </form>
 
           {latestBodyWeight ? (

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getServerSidePrismaClient } from "@/lib/db.server";
-import { authMiddleware } from "@/lib/auth.server";
+import { authMiddleware, csrfProtectionMiddleware } from "@/lib/auth.server";
 import {
   archiveMovementInputSchema,
   createMovementInputSchema,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/validation/workout-progression";
 
 export const createMovementServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(createMovementInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -35,7 +35,7 @@ export const createMovementServerFn = createServerFn({ method: "POST" })
   });
 
 export const updateMovementServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(updateMovementInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -69,7 +69,7 @@ export const updateMovementServerFn = createServerFn({ method: "POST" })
   });
 
 export const archiveMovementServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(archiveMovementInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();

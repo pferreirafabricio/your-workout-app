@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { AddButton, CancelButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { archiveMovementServerFn, createMovementServerFn, updateMovementServerFn } from "@/lib/movements.server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,9 @@ import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { equipmentQueryOptions, movementsQueryOptions } from "./-queries/movements";
 import { Select } from "@/components/ui/select";
 import { archiveMovementInputSchema, createMovementInputSchema, updateMovementInputSchema } from "@/lib/validation/workout-progression";
-import { Archive, ArchiveRestore } from "lucide-react";
+import { Archive, ArchiveRestore, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getCsrfHeaders } from "@/lib/csrf.client";
 
 type MuscleGroupValue =
   | "CHEST"
@@ -42,6 +45,7 @@ function MovementsPage() {
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroupValue | "">("");
   const [equipmentId, setEquipmentId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingArchiveTarget, setPendingArchiveTarget] = useState<{ id: string; currentlyArchived: boolean } | null>(null);
   const [error, setError] = useState("");
 
   const createMovementMutation = useMutation({
@@ -50,7 +54,7 @@ function MovementsPage() {
       type: "WEIGHTED" | "BODYWEIGHT";
       muscleGroup?: MuscleGroupValue | null;
       equipmentId: string | null;
-    }) => createMovementServerFn({ data: payload }),
+    }) => createMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setError(response.error ?? "Could not create movement.");
@@ -72,7 +76,7 @@ function MovementsPage() {
       type: "WEIGHTED" | "BODYWEIGHT";
       muscleGroup?: MuscleGroupValue | null;
       equipmentId: string | null;
-    }) => updateMovementServerFn({ data: payload }),
+    }) => updateMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setError(response.error ?? "Could not update movement.");
@@ -86,7 +90,8 @@ function MovementsPage() {
   });
 
   const archiveMovementMutation = useMutation({
-    mutationFn: (payload: { movementId: string; archive: boolean }) => archiveMovementServerFn({ data: payload }),
+    mutationFn: (payload: { movementId: string; archive: boolean }) =>
+      archiveMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setError(response.message ?? response.error ?? "Could not change archive state.");
@@ -141,22 +146,32 @@ function MovementsPage() {
     });
   };
 
-  const toggleArchive = (movementId: string, currentlyArchived: boolean) => {
-    if (!confirm(currentlyArchived ? "Restore this movement?" : "Archive this movement?")) {
-      return;
-    }
+  const requestArchiveToggle = (movementId: string, currentlyArchived: boolean) => {
+    setPendingArchiveTarget({ id: movementId, currentlyArchived });
+  };
+
+  const confirmArchiveToggle = () => {
+    if (!pendingArchiveTarget) return;
 
     const parsed = archiveMovementInputSchema.safeParse({
-      movementId,
-      archive: !currentlyArchived,
+      movementId: pendingArchiveTarget.id,
+      archive: !pendingArchiveTarget.currentlyArchived,
     });
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid archive request.");
+      setPendingArchiveTarget(null);
       return;
     }
 
-    archiveMovementMutation.mutate(parsed.data);
+    archiveMovementMutation.mutate(parsed.data, {
+      onSuccess: () => {
+        setPendingArchiveTarget(null);
+      },
+      onError: () => {
+        setPendingArchiveTarget(null);
+      },
+    });
   };
 
   const beginEdit = (movement: {
@@ -231,15 +246,18 @@ function MovementsPage() {
               ))}
             </Select>
             {!editingId ? (
-              <Button type="submit" disabled={!name.trim()}>
-                {createMovementMutation.isPending ? "Adding..." : "Add"}
-              </Button>
+              <AddButton type="submit" disabled={!name.trim()} isLoading={createMovementMutation.isPending} />
             ) : (
               <div className="flex items-center gap-2 md:col-span-5">
-                <Button type="button" onClick={() => handleUpdate(editingId)} disabled={!name.trim()}>
-                  {updateMovementMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-                <Button
+                <SaveButton
+                  type="button"
+                  onClick={() => handleUpdate(editingId)}
+                  disabled={!name.trim()}
+                  isLoading={updateMovementMutation.isPending}
+                  loadingText="Saving...">
+                  Save Changes
+                </SaveButton>
+                <CancelButton
                   type="button"
                   variant="ghost"
                   onClick={() => {
@@ -250,7 +268,7 @@ function MovementsPage() {
                     setEquipmentId("");
                   }}>
                   Cancel
-                </Button>
+                </CancelButton>
               </div>
             )}
           </form>
@@ -286,13 +304,13 @@ function MovementsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => beginEdit(movement)}>
+                    <EditButton variant="ghost" size="sm" onClick={() => beginEdit(movement)} iconOnly={false}>
                       Edit
-                    </Button>
+                    </EditButton>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleArchive(movement.id, Boolean(movement.archivedAt))}>
+                      onClick={() => requestArchiveToggle(movement.id, Boolean(movement.archivedAt))}>
                       {movement.archivedAt ? (
                         <>
                           <ArchiveRestore className="h-4 w-4 mr-1" />
@@ -312,6 +330,27 @@ function MovementsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={pendingArchiveTarget != null}
+        title={pendingArchiveTarget?.currentlyArchived ? "Restore movement?" : "Archive movement?"}
+        description={
+          pendingArchiveTarget?.currentlyArchived
+            ? "This makes the movement available again when logging new workouts."
+            : "This hides the movement from new workout logging while keeping history intact."
+        }
+        confirmLabel={pendingArchiveTarget?.currentlyArchived ? "Restore" : "Archive"}
+        cancelLabel="Cancel"
+        cancelIcon={X}
+        confirmIcon={pendingArchiveTarget?.currentlyArchived ? ArchiveRestore : Archive}
+        isPending={archiveMovementMutation.isPending}
+        onConfirm={confirmArchiveToggle}
+        onCancel={() => {
+          if (!archiveMovementMutation.isPending) {
+            setPendingArchiveTarget(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,63 +1,44 @@
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { redirect } from "@tanstack/react-router";
-import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
+import {
+  deleteCookie,
+  getCookie,
+  getRequestHeader,
+  getRequestUrl,
+  setCookie,
+} from "@tanstack/react-start/server";
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
-import { sessionCookieName } from "./auth.consts";
+import {
+  accessTokenCookieName,
+  csrfTokenCookieName,
+  refreshTokenCookieName,
+} from "./auth.consts";
 import { getServerSidePrismaClient } from "./db.server";
-import { signInInputSchema } from "@/lib/validation/workout-progression";
+import {
+  signInInputSchema,
+  strongPasswordSchema,
+} from "@/lib/validation/workout-progression";
 import { z } from "zod";
-
-function scryptAsync(password: string, salt: string, keylen: number, options: crypto.ScryptOptions): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    crypto.scrypt(password, salt, keylen, options, (err, derivedKey) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(derivedKey as Buffer);
-    });
-  });
-}
 
 // In production, use a proper secret from environment variables
 const COOKIE_SECRET = process.env.COOKIE_SECRET || "dev-secret-change-in-production";
-const SCRYPT_N = 16384;
-const SCRYPT_R = 8;
-const SCRYPT_P = 1;
-const SCRYPT_KEY_LEN = 64;
+const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CSRF_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_MS;
+const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
 
 const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+import { DEFAULT_REST_TARGET_SECONDS } from "./types";
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = await scryptAsync(password, salt, SCRYPT_KEY_LEN, {
-    N: SCRYPT_N,
-    r: SCRYPT_R,
-    p: SCRYPT_P,
-  });
-  return ["scrypt", SCRYPT_N, SCRYPT_R, SCRYPT_P, salt, derived.toString("hex")].join("$");
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 export async function verifyPassword(password: string, encodedHash: string): Promise<boolean> {
-  const [algo, nStr, rStr, pStr, salt, expectedHex] = encodedHash.split("$");
-  if (algo !== "scrypt" || !nStr || !rStr || !pStr || !salt || !expectedHex) {
-    return false;
-  }
-
-  const expected = Buffer.from(expectedHex, "hex");
-  const derived = await scryptAsync(password, salt, expected.length, {
-    N: Number(nStr),
-    r: Number(rStr),
-    p: Number(pStr),
-  });
-
-  if (expected.length !== derived.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(expected, derived);
+  return bcrypt.compare(password, encodedHash);
 }
 
 export function getEmailFingerprint(email: string): string {
@@ -75,66 +56,263 @@ export function isWithinLockoutWindow(windowStartedAt: Date | null | undefined, 
   return now.getTime() - windowStartedAt.getTime() <= LOCKOUT_WINDOW_MS;
 }
 
-/**
- * Signs a user ID to create a tamper-proof session token
- */
-function signUserId(userId: string): string {
-  const signature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  return `${userId}.${signature}`;
+type TokenPayload = {
+  typ: "access" | "refresh";
+  sub: string;
+  iat: number;
+  exp: number;
+};
+
+function encodeTokenPayload(payload: TokenPayload): string {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
 
-/**
- * Verifies a signed session token and returns the user ID if valid
- */
-function verifySessionToken(token: string): string | null {
-  const [userId, signature] = token.split(".");
-  if (!userId || !signature) return null;
+function decodeTokenPayload(rawPayload: string): TokenPayload | null {
+  try {
+    const decoded = Buffer.from(rawPayload, "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded) as Partial<TokenPayload>;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
 
-  const expectedSignature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  const expectedBuffer = Buffer.from(expectedSignature, "hex");
-  const providedBuffer = Buffer.from(signature, "hex");
+    if (
+      (parsed.typ !== "access" && parsed.typ !== "refresh") ||
+      typeof parsed.sub !== "string" ||
+      typeof parsed.iat !== "number" ||
+      typeof parsed.exp !== "number"
+    ) {
+      return null;
+    }
 
-  if (expectedBuffer.length !== providedBuffer.length) return null;
-  if (!crypto.timingSafeEqual(expectedBuffer, providedBuffer)) return null;
-
-  return userId;
+    return {
+      typ: parsed.typ,
+      sub: parsed.sub,
+      iat: parsed.iat,
+      exp: parsed.exp,
+    };
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Sets the session cookie for a user (internal use only)
- */
-function setSessionCookie(userId: string) {
-  const token = signUserId(userId);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+function signToken(payload: TokenPayload): string {
+  const rawPayload = encodeTokenPayload(payload);
+  const signature = crypto
+    .createHmac("sha256", COOKIE_SECRET)
+    .update(rawPayload)
+    .digest("base64url");
+  return `${rawPayload}.${signature}`;
+}
 
-  setCookie(sessionCookieName, token, {
+function verifyToken(token: string, expectedType: TokenPayload["typ"]): TokenPayload | null {
+  const [rawPayload, providedSignature] = token.split(".");
+  if (!rawPayload || !providedSignature) {
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", COOKIE_SECRET)
+    .update(rawPayload)
+    .digest("base64url");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+  const providedBuffer = Buffer.from(providedSignature, "utf8");
+
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return null;
+  }
+  if (!crypto.timingSafeEqual(expectedBuffer, providedBuffer)) {
+    return null;
+  }
+
+  const payload = decodeTokenPayload(rawPayload);
+  if (!payload || payload.typ !== expectedType) {
+    return null;
+  }
+  if (payload.exp <= Date.now()) {
+    return null;
+  }
+
+  return payload;
+}
+
+function issueAccessToken(userId: string): { token: string; expiresAt: Date } {
+  const now = Date.now();
+  const expiresAt = new Date(now + ACCESS_TOKEN_TTL_MS);
+  const token = signToken({
+    typ: "access",
+    sub: userId,
+    iat: now,
+    exp: expiresAt.getTime(),
+  });
+  return { token, expiresAt };
+}
+
+function issueRefreshToken(userId: string): { token: string; expiresAt: Date } {
+  const now = Date.now();
+  const expiresAt = new Date(now + REFRESH_TOKEN_TTL_MS);
+  const token = signToken({
+    typ: "refresh",
+    sub: userId,
+    iat: now,
+    exp: expiresAt.getTime(),
+  });
+  return { token, expiresAt };
+}
+
+function issueCsrfToken(): { token: string; expiresAt: Date } {
+  return {
+    token: crypto.randomBytes(32).toString("base64url"),
+    expiresAt: new Date(Date.now() + CSRF_TOKEN_TTL_MS),
+  };
+}
+
+function setAuthCookies(userId: string) {
+  const access = issueAccessToken(userId);
+  const refresh = issueRefreshToken(userId);
+  const csrf = issueCsrfToken();
+
+  setCookie(accessTokenCookieName, access.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    expires: expiresAt,
+    expires: access.expiresAt,
+    path: "/",
+  });
+
+  setCookie(refreshTokenCookieName, refresh.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    expires: refresh.expiresAt,
+    path: "/",
+  });
+
+  setCookie(csrfTokenCookieName, csrf.token, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    expires: csrf.expiresAt,
+    path: "/",
   });
 }
+
+function ensureCsrfCookie() {
+  const currentToken = getCookie(csrfTokenCookieName);
+  if (currentToken) {
+    return;
+  }
+
+  const csrf = issueCsrfToken();
+  setCookie(csrfTokenCookieName, csrf.token, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    expires: csrf.expiresAt,
+    path: "/",
+  });
+}
+
+function clearAuthCookies() {
+  deleteCookie(accessTokenCookieName, { path: "/" });
+  deleteCookie(refreshTokenCookieName, { path: "/" });
+  deleteCookie(csrfTokenCookieName, { path: "/" });
+}
+
+function isTrustedOrigin(): boolean {
+  const requestUrl = getRequestUrl({
+    xForwardedHost: true,
+    xForwardedProto: true,
+  });
+  const expectedOrigin = requestUrl.origin;
+  const origin = getRequestHeader("origin");
+
+  if (origin) {
+    return origin === expectedOrigin;
+  }
+
+  const referer = getRequestHeader("referer");
+  if (!referer) {
+    return false;
+  }
+
+  try {
+    return new URL(referer).origin === expectedOrigin;
+  } catch {
+    return false;
+  }
+}
+
+function hasValidCsrfToken(): boolean {
+  const cookieToken = getCookie(csrfTokenCookieName);
+  const headerToken = getRequestHeader("x-csrf-token");
+
+  if (!cookieToken || !headerToken) {
+    return false;
+  }
+
+  const cookieTokenBuffer = Buffer.from(cookieToken, "utf8");
+  const headerTokenBuffer = Buffer.from(headerToken, "utf8");
+
+  if (cookieTokenBuffer.length !== headerTokenBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(cookieTokenBuffer, headerTokenBuffer);
+}
+
+export const csrfProtectionMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  if (!isTrustedOrigin() || !hasValidCsrfToken()) {
+    throw new Response("Forbidden", { status: 403 });
+  }
+
+  return next();
+});
 
 /**
  * Gets the current user from session cookie
  * @returns User object or null if not logged in
  */
 export const getUserServerFn = createServerFn().handler(async () => {
-  const sessionToken = getCookie(sessionCookieName);
-  if (!sessionToken) {
-    return null;
-  }
-
-  const userId = verifySessionToken(sessionToken);
-  if (!userId) {
-    return null;
-  }
-
   const prisma = await getServerSidePrismaClient();
+
+  const accessToken = getCookie(accessTokenCookieName);
+  const accessPayload = accessToken ? verifyToken(accessToken, "access") : null;
+
+  if (accessPayload) {
+    const user = await prisma.user.findUnique({
+      where: { id: accessPayload.sub },
+    });
+    if (!user) {
+      clearAuthCookies();
+      ensureCsrfCookie();
+      return null;
+    }
+
+    ensureCsrfCookie();
+    return user;
+  }
+
+  const refreshToken = getCookie(refreshTokenCookieName);
+  const refreshPayload = refreshToken ? verifyToken(refreshToken, "refresh") : null;
+  if (!refreshPayload) {
+    ensureCsrfCookie();
+    return null;
+  }
+
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: refreshPayload.sub },
   });
 
+  if (!user) {
+    clearAuthCookies();
+    ensureCsrfCookie();
+    return null;
+  }
+
+  // Rotate short-lived access + refresh tokens after refresh validation.
+  setAuthCookies(user.id);
+
+  ensureCsrfCookie();
   return user;
 });
 
@@ -142,6 +320,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
  * Signs in a user with email and password
  */
 export const signInServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware])
   .inputValidator(signInInputSchema)
   .handler(async ({ data }) => {
     const { email, password } = data;
@@ -246,7 +425,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
       },
     });
 
-    setSessionCookie(user.id);
+    setAuthCookies(user.id);
 
     return { success: true as const };
   });
@@ -255,11 +434,12 @@ export const signInServerFn = createServerFn({ method: "POST" })
  * Creates a new user account
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware])
   .inputValidator(
     z.object({
-      email: z.string().email(),
+      email: z.email(),
       name: z.string().trim().min(1).max(120),
-      password: z.string().min(8).max(256),
+      password: strongPasswordSchema,
     }),
   )
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
@@ -279,10 +459,20 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
     const passwordHash = await hashPassword(password);
 
     const user = await prisma.user.create({
-      data: { email: normalizedEmail, name, passwordHash },
+      data: {
+        email: normalizedEmail,
+        name,
+        passwordHash,
+        preference: {
+          create: {
+            weightUnit: "KG",
+            defaultRestTargetSeconds: DEFAULT_REST_TARGET_SECONDS,
+          },
+        },
+      },
     });
 
-    setSessionCookie(user.id);
+    setAuthCookies(user.id);
 
     return { success: true as const };
   });
@@ -290,10 +480,12 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
 /**
  * Logs out the current user
  */
-export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
-  deleteCookie(sessionCookieName);
-  return { success: true };
-});
+export const logoutServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware])
+  .handler(async () => {
+    clearAuthCookies();
+    return { success: true };
+  });
 
 /**
  * Authentication middleware that ensures user is logged in

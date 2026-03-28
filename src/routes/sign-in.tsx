@@ -1,10 +1,12 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { signInServerFn } from "@/lib/auth.server";
 import { signInInputSchema } from "@/lib/validation/workout-progression";
+import { getCsrfHeaders } from "@/lib/csrf.client";
+import { UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/sign-in")({
   beforeLoad: ({ context }) => {
@@ -34,9 +36,9 @@ export function SignInPage() {
         return;
       }
 
-      const result = await signInServerFn({ data: parsed.data });
+      const result = await signInServerFn({ data: parsed.data, headers: getCsrfHeaders() });
       if (result.success) {
-        window.location.assign("/current-workout");
+        globalThis.location.assign("/current-workout");
         return;
       } else if (result.error === "LOCKED_OUT") {
         setError(`Too many failed attempts. Try again in ${result.retryAfterSeconds} seconds.`);
@@ -93,14 +95,21 @@ export function SignInPage() {
                 autoComplete="current-password"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
+            <SubmitButton
+              className="w-full"
+              disabled={isLoading}
+              isLoading={isLoading}
+              loadingText="Signing in...">
+              Sign in
+            </SubmitButton>
           </form>
           <p className="mt-4 text-center text-sm text-gray-500">
             Don't have an account?{" "}
             <Link to="/create-account" className="text-primary hover:underline font-medium">
-              Create one
+              <span className="inline-flex items-center gap-1">
+                <UserPlus className="h-4 w-4" />
+                Create one
+              </span>
             </Link>
           </p>
         </CardContent>

@@ -5,14 +5,23 @@ import {
   isWithinLockoutWindow,
   verifyPassword,
 } from "@/lib/auth.server";
+import { strongPasswordSchema } from "@/lib/validation/workout-progression";
 
 describe("auth security helpers", () => {
   it("hashes and verifies a password", async () => {
     const encoded = await hashPassword("SuperStrongPass123");
-    expect(encoded.startsWith("scrypt$")).toBe(true);
+    expect(encoded.startsWith("$2")).toBe(true);
 
     await expect(verifyPassword("SuperStrongPass123", encoded)).resolves.toBe(true);
     await expect(verifyPassword("WrongPassword", encoded)).resolves.toBe(false);
+  });
+
+  it("enforces strong password requirements", () => {
+    expect(strongPasswordSchema.safeParse("alllowercase1!").success).toBe(false);
+    expect(strongPasswordSchema.safeParse("ALLUPPERCASE1!").success).toBe(false);
+    expect(strongPasswordSchema.safeParse("NoNumber!").success).toBe(false);
+    expect(strongPasswordSchema.safeParse("NoSpecial1").success).toBe(false);
+    expect(strongPasswordSchema.safeParse("StrongPass1!").success).toBe(true);
   });
 
   it("calculates deterministic email fingerprint", () => {

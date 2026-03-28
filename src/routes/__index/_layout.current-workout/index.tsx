@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { AddButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -11,7 +12,7 @@ import {
   updateSetServerFn,
   deleteSetServerFn,
 } from "@/lib/workouts.server";
-import { Play, Check, Plus, X, Save, PencilLine } from "lucide-react";
+import { Play, Check, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   bodyWeightSeriesQueryOptions,
@@ -21,6 +22,8 @@ import {
 } from "./-queries/current-workout";
 import { addSetInputSchema, updateSetInputSchema } from "@/lib/validation/workout-progression";
 import { formatDurationSeconds, formatWeight } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getCsrfHeaders } from "@/lib/csrf.client";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
@@ -46,6 +49,7 @@ function CurrentWorkoutPage() {
   const [rpe, setRpe] = useState("");
   const [notes, setNotes] = useState("");
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [pendingDeleteSetId, setPendingDeleteSetId] = useState<string | null>(null);
   const [setFormError, setSetFormError] = useState("");
   const [completionSummary, setCompletionSummary] = useState<{
     durationSeconds: number;
@@ -53,14 +57,14 @@ function CurrentWorkoutPage() {
   } | null>(null);
 
   const createWorkoutMutation = useMutation({
-    mutationFn: () => createWorkoutServerFn(),
+    mutationFn: () => createWorkoutServerFn({ headers: getCsrfHeaders() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
     },
   });
 
   const completeWorkoutMutation = useMutation({
-    mutationFn: () => completeWorkoutServerFn(),
+    mutationFn: () => completeWorkoutServerFn({ headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (response.success) {
         setCompletionSummary({
@@ -82,7 +86,7 @@ function CurrentWorkoutPage() {
       notes?: string | null;
       loggedAt?: string;
     }) =>
-      addSetServerFn({ data }),
+      addSetServerFn({ data, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setSetFormError(response.error ?? "Unable to save set.");
@@ -105,7 +109,7 @@ function CurrentWorkoutPage() {
       rpe?: number | null;
       notes?: string | null;
       expectedVersion?: number;
-    }) => updateSetServerFn({ data }),
+    }) => updateSetServerFn({ data, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
         setSetFormError(response.error ?? "Unable to update set.");
@@ -122,7 +126,7 @@ function CurrentWorkoutPage() {
   });
 
   const deleteSetMutation = useMutation({
-    mutationFn: (setId: string) => deleteSetServerFn({ data: { setId } }),
+    mutationFn: (setId: string) => deleteSetServerFn({ data: { setId }, headers: getCsrfHeaders() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
     },
@@ -203,6 +207,22 @@ function CurrentWorkoutPage() {
     setRpe(set.rpe == null ? "" : String(set.rpe));
     setNotes(set.notes ?? "");
     setSetFormError("");
+  };
+
+  const requestDeleteSet = (setId: string) => {
+    setPendingDeleteSetId(setId);
+  };
+
+  const confirmDeleteSet = () => {
+    if (!pendingDeleteSetId) return;
+    deleteSetMutation.mutate(pendingDeleteSetId, {
+      onSuccess: () => {
+        setPendingDeleteSetId(null);
+      },
+      onError: () => {
+        setPendingDeleteSetId(null);
+      },
+    });
   };
 
   if (!workout) {
@@ -312,10 +332,12 @@ function CurrentWorkoutPage() {
               className="w-full"
               maxLength={500}
             />
-            <Button type="submit" disabled={!selectedMovement || !reps} size="sm">
-              <Plus className="w-4 h-4 mr-1" />
-              {addSetMutation.isPending ? "Adding..." : "Add"}
-            </Button>
+            <AddButton
+              type="submit"
+              size="sm"
+              disabled={!selectedMovement || !reps}
+              isLoading={addSetMutation.isPending}
+            />
           </form>
 
           {!canCompleteWorkout && (
@@ -360,30 +382,30 @@ function CurrentWorkoutPage() {
                         />
                         <Input type="number" value={rpe} min={1} max={10} step={0.5} onChange={(event) => setRpe(event.target.value)} />
                         <Input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />
-                        <Button
+                        <SaveButton
                           size="sm"
                           onClick={() => handleInlineSave(set.id, set.version)}
                           disabled={updateSetMutation.isPending}>
-                          <Save className="h-4 w-4 mr-1" />
                           Save
-                        </Button>
+                        </SaveButton>
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEditor(set)} className="h-8 w-8 text-slate-400">
-                      <PencilLine className="w-4 h-4" />
-                    </Button>
-                    <Button
+                    <EditButton
+                      onClick={() => openEditor(set)}
+                      className="h-8 w-8 text-slate-400"
+                      iconOnly
+                    />
+                    <DeleteButton
                       variant="ghost"
                       size="icon"
-                      onClick={() => {
-                        if (!confirm("Delete this set?")) return;
-                        deleteSetMutation.mutate(set.id);
-                      }}
-                      className="h-8 w-8 text-slate-400">
-                      <X className="w-4 h-4" />
-                    </Button>
+                      iconOnly
+                      onClick={() => requestDeleteSet(set.id)}
+                      className="h-8 w-8 text-slate-400"
+                      aria-label="Delete set">
+                      Delete set
+                    </DeleteButton>
                   </div>
                 </li>
               ))}
@@ -403,6 +425,22 @@ function CurrentWorkoutPage() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteSetId != null}
+        title="Delete set?"
+        description="This permanently removes the set from the active workout."
+        confirmLabel="Delete Set"
+        cancelLabel="Cancel"
+        cancelIcon={X}
+        isPending={deleteSetMutation.isPending}
+        onConfirm={confirmDeleteSet}
+        onCancel={() => {
+          if (!deleteSetMutation.isPending) {
+            setPendingDeleteSetId(null);
+          }
+        }}
+      />
     </div>
   );
 }

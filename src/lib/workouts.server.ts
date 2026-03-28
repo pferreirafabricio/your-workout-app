@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getServerSidePrismaClient } from "@/lib/db.server";
-import { authMiddleware } from "@/lib/auth.server";
+import { authMiddleware, csrfProtectionMiddleware } from "@/lib/auth.server";
+import { Prisma } from "../../prisma/generated/client/client";
 import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/types";
 import { fromCanonicalKg, toCanonicalKg } from "@/lib/utils";
 import {
@@ -68,18 +69,31 @@ function fromDbWeightUnit(unit: "KG" | "LBS"): WeightUnit {
   return unit === "KG" ? "kg" : "lbs";
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
 async function getOrCreateUserPreference(prisma: Awaited<ReturnType<typeof getServerSidePrismaClient>>, userId: string) {
   const existing = await prisma.userPreference.findUnique({ where: { userId } });
   if (existing) {
     return existing;
   }
-  return prisma.userPreference.create({
-    data: {
-      userId,
-      weightUnit: "KG",
-      defaultRestTargetSeconds: DEFAULT_REST_TARGET_SECONDS,
-    },
-  });
+
+  try {
+    return await prisma.userPreference.create({
+      data: {
+        userId,
+        weightUnit: "KG",
+        defaultRestTargetSeconds: DEFAULT_REST_TARGET_SECONDS,
+      },
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    return prisma.userPreference.findUniqueOrThrow({ where: { userId } });
+  }
 }
 
 function projectSetForDisplay(
@@ -120,7 +134,7 @@ function projectSetForDisplay(
 }
 
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
 
@@ -144,7 +158,7 @@ export const createWorkoutServerFn = createServerFn({ method: "POST" })
   });
 
 export const updateWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(
     z.object({
       name: z.string().trim().min(1).max(120).nullable(),
@@ -212,7 +226,7 @@ export const getCurrentWorkoutServerFn = createServerFn()
   });
 
 export const completeWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
 
@@ -243,7 +257,7 @@ export const completeWorkoutServerFn = createServerFn({ method: "POST" })
   });
 
 export const addSetServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(addSetInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -307,7 +321,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
   });
 
 export const updateSetServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(updateSetInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -368,7 +382,7 @@ export const updateSetServerFn = createServerFn({ method: "POST" })
   });
 
 export const deleteSetServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(deleteSetInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -390,23 +404,34 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
   });
 
 export const setUserPreferencesServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(setUserPreferencesInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
 
-    const preference = await prisma.userPreference.upsert({
-      where: { userId: context.user.id },
-      create: {
-        userId: context.user.id,
-        weightUnit: toDbWeightUnit(data.weightUnit),
-        defaultRestTargetSeconds: data.defaultRestTargetSeconds,
-      },
-      update: {
-        weightUnit: toDbWeightUnit(data.weightUnit),
-        defaultRestTargetSeconds: data.defaultRestTargetSeconds,
-      },
-    });
+    const nextValues = {
+      weightUnit: toDbWeightUnit(data.weightUnit),
+      defaultRestTargetSeconds: data.defaultRestTargetSeconds,
+    };
+
+    let preference;
+    try {
+      preference = await prisma.userPreference.create({
+        data: {
+          userId: context.user.id,
+          ...nextValues,
+        },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      preference = await prisma.userPreference.update({
+        where: { userId: context.user.id },
+        data: nextValues,
+      });
+    }
 
     return {
       success: true as const,
@@ -429,7 +454,7 @@ export const getUserPreferencesServerFn = createServerFn()
   });
 
 export const recordBodyWeightServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(recordBodyWeightInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
@@ -487,7 +512,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
   });
 
 export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([csrfProtectionMiddleware, authMiddleware])
   .inputValidator(z.object({ workoutIds: z.array(z.string()).min(1) }))
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();

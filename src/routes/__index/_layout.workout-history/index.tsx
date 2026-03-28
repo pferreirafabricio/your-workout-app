@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/ui/action-buttons";
 import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import {
   bodyWeightHistoryQueryOptions,
   progressionSeriesQueryOptions,
@@ -12,6 +12,8 @@ import {
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Select } from "@/components/ui/select";
 import { formatDateTime, formatNumber, formatWeight } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getCsrfHeaders } from "@/lib/csrf.client";
 
 type MovementTuple = [string, string];
 
@@ -54,6 +56,7 @@ function WorkoutHistoryPage() {
   const { data: workouts } = useSuspenseQuery(workoutHistoryQueryOptions());
   const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightHistoryQueryOptions());
   const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedMovementId, setSelectedMovementId] = useState("");
   const [selectedMetric, setSelectedMetric] = useState<"maxWeight" | "totalReps" | "totalVolume">("maxWeight");
 
@@ -62,7 +65,8 @@ function WorkoutHistoryPage() {
   );
 
   const deleteWorkoutsMutation = useMutation({
-    mutationFn: (workoutIds: string[]) => deleteWorkoutsServerFn({ data: { workoutIds } }),
+    mutationFn: (workoutIds: string[]) =>
+      deleteWorkoutsServerFn({ data: { workoutIds }, headers: getCsrfHeaders() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workoutHistoryQueryOptions().queryKey });
       setSelectedWorkouts(new Set());
@@ -100,7 +104,24 @@ function WorkoutHistoryPage() {
 
   const handleDeleteSelected = () => {
     if (selectedWorkouts.size === 0) return;
-    deleteWorkoutsMutation.mutate(Array.from(selectedWorkouts));
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteSelected = () => {
+    const workoutIds = Array.from(selectedWorkouts);
+    if (workoutIds.length === 0) {
+      setIsDeleteConfirmOpen(false);
+      return;
+    }
+
+    deleteWorkoutsMutation.mutate(workoutIds, {
+      onSuccess: () => {
+        setIsDeleteConfirmOpen(false);
+      },
+      onError: () => {
+        setIsDeleteConfirmOpen(false);
+      },
+    });
   };
 
   return (
@@ -180,14 +201,15 @@ function WorkoutHistoryPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Completed Workouts</CardTitle>
-          <Button
+          <DeleteButton
             size="sm"
             variant="destructive"
             onClick={handleDeleteSelected}
-            disabled={selectedWorkouts.size === 0}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            {deleteWorkoutsMutation.isPending ? "Deleting..." : `Delete Selected (${selectedWorkouts.size})`}
-          </Button>
+            disabled={selectedWorkouts.size === 0}
+            isLoading={deleteWorkoutsMutation.isPending}
+            loadingText="Deleting...">
+            {`Delete Selected (${selectedWorkouts.size})`}
+          </DeleteButton>
         </CardHeader>
         <CardContent>
           {workouts.length === 0 ? (
@@ -274,6 +296,23 @@ function WorkoutHistoryPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={isDeleteConfirmOpen}
+        title="Delete selected workouts?"
+        description={`This permanently deletes ${selectedWorkouts.size} completed workout${selectedWorkouts.size === 1 ? "" : "s"} and all logged sets in them.`}
+        confirmLabel="Delete Workouts"
+        cancelLabel="Cancel"
+        confirmIcon={Trash2}
+        cancelIcon={X}
+        isPending={deleteWorkoutsMutation.isPending}
+        onConfirm={confirmDeleteSelected}
+        onCancel={() => {
+          if (!deleteWorkoutsMutation.isPending) {
+            setIsDeleteConfirmOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }
