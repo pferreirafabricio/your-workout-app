@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { signInServerFn } from "@/lib/auth.server";
 import { signInInputSchema } from "@/lib/validation/workout-progression";
 import { getCsrfHeaders } from "@/lib/csrf.client";
+import { formatRetryDelay } from "@/lib/helpers/time";
 import { UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/sign-in")({
@@ -41,7 +42,7 @@ export function SignInPage() {
         globalThis.location.assign("/current-workout");
         return;
       } else if (result.error === "LOCKED_OUT") {
-        setError(`Too many failed attempts. Try again in ${result.retryAfterSeconds} seconds.`);
+        setError(`Too many failed attempts. Try again in ${formatRetryDelay(result.retryAfterSeconds)}.`);
       } else if (result.error === "INVALID_CREDENTIALS") {
         setError("Invalid email or password");
       } else {

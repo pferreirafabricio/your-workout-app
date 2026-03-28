@@ -31,7 +31,7 @@ const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
 const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 import { DEFAULT_REST_TARGET_SECONDS } from "./types";
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
