@@ -18,8 +18,10 @@ RUN bun run generate
 
 # development
 FROM deps AS development
+ARG USER_ID=1000
+ARG GROUP_ID=1000
 WORKDIR /app
-USER appuser
+USER ${USER_ID}:${GROUP_ID}
 CMD ["vite", "dev", "--host", "0.0.0.0", "--port", "3000"]
 
 # production

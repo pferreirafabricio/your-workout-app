@@ -1,2 +1,10 @@
 node_modules
 generated/
+.git/
+Dockerfile*
+.dockerignore
+*.log*
+.env*
+coverage/
+playwright-report/
+test-results/
