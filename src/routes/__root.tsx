@@ -12,14 +12,13 @@ import { getServerConfigServerFn } from "@/lib/get-server-config.server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ToastContainer } from "react-toastify";
-import toastifyStyles from "react-toastify/dist/ReactToastify.css?url";
+import { Toaster } from "@/components/ui/sonner";
 
 interface MyRouterContext {
   queryClient: QueryClient;
 }
 
-function RootErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function RootErrorComponent({ error, reset }: Readonly<{ error: Error; reset: () => void }>) {
   const router = useRouter();
   const clientConfig = useClientConfig();
   const isDev = clientConfig.environment === "development";
@@ -30,7 +29,7 @@ function RootErrorComponent({ error, reset }: { error: Error; reset: () => void 
 Error Message: ${error.message}
 Timestamp: ${new Date().toISOString()}
 User Agent: ${navigator.userAgent}
-URL: ${window.location.href}
+URL: ${globalThis.location.href}
 
 Stack Trace:
 ${error.stack || "No stack trace available"}`;
@@ -157,11 +156,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         rel: "stylesheet",
-        href: toastifyStyles,
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Manrope:wght@200..800&display=swap",
       },
     ],
   }),
@@ -169,16 +164,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
 });
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({ children }: Readonly<{ children: React.ReactNode }>) {
   const config = useClientConfig();
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
-      <body className="overflow-hidden">
+      <body className="overflow-x-hidden font-sans antialiased text-slate-900 bg-[radial-gradient(circle_at_top,_#e8f5f9_0%,_#f4f9fb_36%,_#ffffff_70%)]">
         {children}
-        <ToastContainer position="top-right" autoClose={4000} theme="light" />
+        <Toaster position="top-right" duration={4000} richColors />
         {config.environment === "development" && (
           <TanStackDevtools
             config={{

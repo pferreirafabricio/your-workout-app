@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { formatDateTime, formatNumber, formatWeight } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
+import { toast } from "sonner";
 
 type MovementTuple = [string, string];
 
@@ -67,9 +68,14 @@ function WorkoutHistoryPage() {
   const deleteWorkoutsMutation = useMutation({
     mutationFn: (workoutIds: string[]) =>
       deleteWorkoutsServerFn({ data: { workoutIds }, headers: getCsrfHeaders() }),
-    onSuccess: () => {
+    onSuccess: (response, workoutIds) => {
+      if (!response.success) {
+        toast.error("Unable to delete workouts.");
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: workoutHistoryQueryOptions().queryKey });
       setSelectedWorkouts(new Set());
+      toast.success(`${workoutIds.length} workout${workoutIds.length === 1 ? "" : "s"} deleted.`);
     },
   });
 

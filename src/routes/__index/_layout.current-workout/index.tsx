@@ -24,6 +24,7 @@ import { addSetInputSchema, updateSetInputSchema } from "@/lib/validation/workou
 import { formatDurationSeconds, formatWeight } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
@@ -60,6 +61,7 @@ function CurrentWorkoutPage() {
     mutationFn: () => createWorkoutServerFn({ headers: getCsrfHeaders() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+      toast.success("Workout started.");
     },
   });
 
@@ -71,6 +73,9 @@ function CurrentWorkoutPage() {
           durationSeconds: response.summary.durationSeconds,
           totalVolumeKg: response.summary.totalVolumeKg,
         });
+        toast.success("Workout completed.");
+      } else {
+        toast.error(response.error ?? "Unable to complete workout.");
       }
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       queryClient.invalidateQueries({ queryKey: ["workout-history"] });
@@ -89,7 +94,9 @@ function CurrentWorkoutPage() {
       addSetServerFn({ data, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setSetFormError(response.error ?? "Unable to save set.");
+        const message = response.error ?? "Unable to save set.";
+        setSetFormError(message);
+        toast.error(message);
         return;
       }
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
@@ -98,6 +105,7 @@ function CurrentWorkoutPage() {
       setRpe("");
       setNotes("");
       setSetFormError("");
+      toast.success("Set added.");
     },
   });
 
@@ -112,12 +120,17 @@ function CurrentWorkoutPage() {
     }) => updateSetServerFn({ data, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setSetFormError(response.error ?? "Unable to update set.");
+        const message = response.error ?? "Unable to update set.";
+        setSetFormError(message);
+        toast.error(message);
         return;
       }
 
       if (response.replacementNotice) {
         setSetFormError(response.replacementNotice.message);
+        toast.warning(response.replacementNotice.message);
+      } else {
+        toast.success("Set updated.");
       }
 
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
@@ -129,6 +142,7 @@ function CurrentWorkoutPage() {
     mutationFn: (setId: string) => deleteSetServerFn({ data: { setId }, headers: getCsrfHeaders() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+      toast.success("Set deleted.");
     },
   });
 
@@ -141,7 +155,9 @@ function CurrentWorkoutPage() {
 
     const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
     if (selectedMovementRecord?.type === "BODYWEIGHT" && !bodyWeightSeries.length && parsedWeight === undefined) {
-      setSetFormError("Record bodyweight first or enter an explicit weight for bodyweight movements.");
+      const message = "Record bodyweight first or enter an explicit weight for bodyweight movements.";
+      setSetFormError(message);
+      toast.error(message);
       return;
     }
 
@@ -154,7 +170,9 @@ function CurrentWorkoutPage() {
     });
 
     if (!parsed.success) {
-      setSetFormError(parsed.error.issues[0]?.message ?? "Invalid set values.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid set values.";
+      setSetFormError(message);
+      toast.error(message);
       return;
     }
 
@@ -176,7 +194,9 @@ function CurrentWorkoutPage() {
     });
 
     if (!parsed.success) {
-      setSetFormError(parsed.error.issues[0]?.message ?? "Invalid set values.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid set values.";
+      setSetFormError(message);
+      toast.error(message);
       return;
     }
 

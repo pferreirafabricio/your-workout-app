@@ -12,6 +12,7 @@ import { archiveMovementInputSchema, createMovementInputSchema, updateMovementIn
 import { Archive, ArchiveRestore, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
+import { toast } from "sonner";
 
 type MuscleGroupValue =
   | "CHEST"
@@ -57,7 +58,9 @@ function MovementsPage() {
     }) => createMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setError(response.error ?? "Could not create movement.");
+        const message = response.error ?? "Could not create movement.";
+        setError(message);
+        toast.error(message);
         return;
       }
 
@@ -66,6 +69,7 @@ function MovementsPage() {
       setMuscleGroup("");
       setEquipmentId("");
       setError("");
+      toast.success("Movement created.");
     },
   });
 
@@ -79,13 +83,16 @@ function MovementsPage() {
     }) => updateMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setError(response.error ?? "Could not update movement.");
+        const message = response.error ?? "Could not update movement.";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       queryClient.invalidateQueries({ queryKey: movementsQueryOptions().queryKey });
       setEditingId(null);
       setError("");
+      toast.success("Movement updated.");
     },
   });
 
@@ -94,12 +101,15 @@ function MovementsPage() {
       archiveMovementServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setError(response.message ?? response.error ?? "Could not change archive state.");
+        const message = response.message ?? response.error ?? "Could not change archive state.";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       queryClient.invalidateQueries({ queryKey: movementsQueryOptions().queryKey });
       setError("");
+      toast.success("Movement status updated.");
     },
   });
 
@@ -114,7 +124,9 @@ function MovementsPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid movement fields.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid movement fields.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -135,7 +147,9 @@ function MovementsPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid movement fields.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid movement fields.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -159,7 +173,9 @@ function MovementsPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid archive request.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid archive request.";
+      setError(message);
+      toast.error(message);
       setPendingArchiveTarget(null);
       return;
     }

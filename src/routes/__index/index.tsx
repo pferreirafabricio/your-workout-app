@@ -10,6 +10,7 @@ import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/work
 import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/validation/workout-progression";
 import { formatDateTime, formatWeight } from "@/lib/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/__index/")({
   loader: async ({ context }) => {
@@ -36,12 +37,15 @@ function IndexPage() {
       setUserPreferencesServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setError("Could not save preferences.");
+        const message = "Could not save preferences.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setError("");
       queryClient.invalidateQueries({ queryKey: userPreferencesQueryOptions().queryKey });
       queryClient.invalidateQueries({ queryKey: ["current-workout"] });
+      toast.success("Preferences saved.");
     },
   });
 
@@ -50,12 +54,15 @@ function IndexPage() {
       recordBodyWeightServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        setError("Could not record body weight.");
+        const message = "Could not record body weight.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setError("");
       setBodyWeight("");
       queryClient.invalidateQueries({ queryKey: bodyWeightSeriesQueryOptions().queryKey });
+      toast.success("Bodyweight recorded.");
     },
   });
 
@@ -68,7 +75,9 @@ function IndexPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid preferences.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid preferences.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -84,7 +93,9 @@ function IndexPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid body weight.");
+      const message = parsed.error.issues[0]?.message ?? "Invalid body weight.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
