@@ -20,6 +20,9 @@ model User {
   workouts              Workout[]
   movements             Movement[]
   bodyWeightEntries     BodyWeightEntry[]
+  nutritionFoods        NutritionFood[]
+  nutritionDailyLogs    NutritionDailyLog[]
+  nutritionGoal         NutritionGoal?
   preference            UserPreference?
   authLockoutEvents     AuthLockoutEvent[]
 }
@@ -124,6 +127,76 @@ model BodyWeightEntry {
   @@index([userId, recordedAt])
 }
 
+model NutritionDailyLog {
+  id                    String               @id @default(uuid())
+  userId                String
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  localDate             String
+  timeZone              String               @default("UTC")
+  totalProteinG         Float                @default(0)
+  totalCarbsG           Float                @default(0)
+  totalFatsG            Float                @default(0)
+  totalCaloriesCanonical Float               @default(0)
+  totalCaloriesEntered  Float                @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  entries               NutritionFoodEntry[]
+
+  @@unique([userId, localDate])
+  @@index([userId, localDate])
+}
+
+model NutritionFoodEntry {
+  id                 String            @id @default(uuid())
+  dailyLogId         String
+  dailyLog           NutritionDailyLog @relation(fields: [dailyLogId], references: [id], onDelete: Cascade)
+  name               String
+  quantity           Float
+  quantityUnit       QuantityUnit
+  proteinG           Float
+  carbsG             Float
+  fatsG              Float
+  caloriesEntered    Float
+  caloriesCanonical  Float
+  hasCalorieMismatch Boolean           @default(false)
+  version            Int               @default(1)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([dailyLogId, updatedAt])
+}
+
+model NutritionGoal {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calorieTarget  Int
+  proteinTargetG Float
+  carbsTargetG   Float
+  fatsTargetG    Float
+  goalType       NutritionGoalType
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model NutritionFood {
+  id               String       @id @default(uuid())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  defaultQuantity  Float        @default(1)
+  quantityUnit     QuantityUnit
+  calories         Float
+  proteinG         Float
+  carbsG           Float
+  fatsG            Float
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([userId, name])
+  @@unique([userId, name])
+}
+
 model Equipment {
   id           String     @id @default(uuid())
   code         String     @unique
@@ -174,4 +247,15 @@ enum MuscleGroup {
   CALVES
   CORE
   FULL_BODY
+}
+
+enum QuantityUnit {
+  GRAMS
+  SERVING
+}
+
+enum NutritionGoalType {
+  CUT
+  MAINTENANCE
+  BULK
 }

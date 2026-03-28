@@ -8,6 +8,8 @@ import { Select } from "@/components/ui/select";
 import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "./_layout.current-workout/-queries/current-workout";
 import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/features/workouts/workouts.server";
 import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workout-progression";
+import { nutritionGoalsQueryOptions } from "./_layout.nutrition/-queries/nutrition";
+import { upsertNutritionGoalsServerFn } from "@/lib/features/nutrition/nutrition.server";
 import { formatDateTime, formatWeight } from "@/lib/shared/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
@@ -24,11 +26,14 @@ const COMMON_TIME_ZONES = [
   "Australia/Sydney",
 ];
 
+type NutritionGoalType = "CUT" | "MAINTENANCE" | "BULK";
+
 export const Route = createFileRoute("/__index/_layout/settings")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(userPreferencesQueryOptions()),
       context.queryClient.ensureQueryData(bodyWeightSeriesQueryOptions()),
+      context.queryClient.ensureQueryData(nutritionGoalsQueryOptions()),
     ]);
   },
   component: SettingsPage,
@@ -38,6 +43,7 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions());
   const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightSeriesQueryOptions());
+  const { data: nutritionGoals } = useSuspenseQuery(nutritionGoalsQueryOptions());
   const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   const [unit, setUnit] = useState<"kg" | "lbs">(preferences.weightUnit);
@@ -45,6 +51,11 @@ function SettingsPage() {
   const [timeZone, setTimeZone] = useState(preferences.timeZone ?? browserTimeZone);
   const isCustomTimeZone = COMMON_TIME_ZONES.includes(timeZone) === false;
   const [bodyWeight, setBodyWeight] = useState("");
+  const [calorieTarget, setCalorieTarget] = useState(String(nutritionGoals.goals?.calorieTarget ?? ""));
+  const [proteinTarget, setProteinTarget] = useState(String(nutritionGoals.goals?.proteinTargetG ?? ""));
+  const [carbsTarget, setCarbsTarget] = useState(String(nutritionGoals.goals?.carbsTargetG ?? ""));
+  const [fatsTarget, setFatsTarget] = useState(String(nutritionGoals.goals?.fatsTargetG ?? ""));
+  const [goalType, setGoalType] = useState<NutritionGoalType>(nutritionGoals.goals?.goalType ?? "MAINTENANCE");
   const [error, setError] = useState("");
 
   const preferencesMutation = useMutation({
@@ -85,6 +96,29 @@ function SettingsPage() {
     },
   });
 
+  const nutritionGoalsMutation = useMutation({
+    mutationFn: (payload: {
+      calorieTarget: number;
+      proteinTargetG: number;
+      carbsTargetG: number;
+      fatsTargetG: number;
+      goalType: NutritionGoalType;
+    }) => upsertNutritionGoalsServerFn({ data: payload, headers: getCsrfHeaders() }),
+    onSuccess: (response) => {
+      if (!response.success) {
+        const message = response.error ?? "Could not save nutrition goals.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      setError("");
+      queryClient.invalidateQueries({ queryKey: ["nutrition-goals"] });
+      queryClient.invalidateQueries({ queryKey: ["nutrition-daily-log"] });
+      toast.success("Nutrition goals saved.");
+    },
+  });
+
   const savePreferences = (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -120,6 +154,27 @@ function SettingsPage() {
     }
 
     bodyWeightMutation.mutate(parsed.data);
+  };
+
+  const submitNutritionGoals = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const payload = {
+      calorieTarget: Number(calorieTarget),
+      proteinTargetG: Number(proteinTarget),
+      carbsTargetG: Number(carbsTarget),
+      fatsTargetG: Number(fatsTarget),
+      goalType,
+    };
+
+    if ([payload.calorieTarget, payload.proteinTargetG, payload.carbsTargetG, payload.fatsTargetG].some(Number.isNaN)) {
+      const message = "Enter valid nutrition goal values.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    nutritionGoalsMutation.mutate(payload);
   };
 
   const latestBodyWeight = bodyWeightSeries[bodyWeightSeries.length - 1];
@@ -219,6 +274,73 @@ function SettingsPage() {
           ) : (
             <p className="text-sm text-slate-500 mt-4">No bodyweight entries yet.</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Nutrition Goals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submitNutritionGoals} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-calories-goal">
+                Calorie Target (kcal)
+              </label>
+              <Input
+                id="nutrition-calories-goal"
+                type="number"
+                value={calorieTarget}
+                onChange={(event) => setCalorieTarget(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-protein-goal">
+                Protein Target (g)
+              </label>
+              <Input
+                id="nutrition-protein-goal"
+                type="number"
+                value={proteinTarget}
+                onChange={(event) => setProteinTarget(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-carbs-goal">
+                Carbs Target (g)
+              </label>
+              <Input
+                id="nutrition-carbs-goal"
+                type="number"
+                value={carbsTarget}
+                onChange={(event) => setCarbsTarget(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-fats-goal">
+                Fats Target (g)
+              </label>
+              <Input
+                id="nutrition-fats-goal"
+                type="number"
+                value={fatsTarget}
+                onChange={(event) => setFatsTarget(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-goal-type">
+                Goal Type
+              </label>
+              <Select id="nutrition-goal-type" value={goalType} onChange={(event) => setGoalType(event.target.value as NutritionGoalType)}> 
+                <option value="CUT">Cut</option>
+                <option value="MAINTENANCE">Maintenance</option>
+                <option value="BULK">Bulk</option>
+              </Select>
+            </div>
+            <SaveButton type="submit" disabled={nutritionGoalsMutation.isPending} isLoading={nutritionGoalsMutation.isPending}>
+              Save Nutrition Goals
+            </SaveButton>
+          </form>
         </CardContent>
       </Card>
     </div>

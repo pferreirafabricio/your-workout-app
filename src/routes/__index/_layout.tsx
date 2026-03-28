@@ -1,12 +1,12 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Dumbbell, History, BicepsFlexed, Wrench, User, LogOut, Home, Settings } from "lucide-react";
+import { Dumbbell, History, BicepsFlexed, Wrench, User, LogOut, Home, Settings, Salad } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/__index/_layout")({
   component: RouteComponent,
   beforeLoad: ({ context }) => {
     if (!context.user) throw redirect({ to: "/sign-in" });
-    return { user: context.user! };
+    return { user: context.user };
   },
 });
 
@@ -17,6 +17,13 @@ const navItems = [
   { to: "/workout-history", label: "Workout History", icon: History },
   { to: "/movements", label: "Movements", icon: BicepsFlexed },
   { to: "/equipment", label: "Equipment", icon: Wrench },
+] as const;
+
+const nutritionSubMenus = [
+  { to: "/nutrition", label: "Daily Log" },
+  { to: "/nutrition/foods", label: "Foods" },
+  { to: "/nutrition/calories-macros", label: "Calories & Macros" },
+  { to: "/settings", label: "Goals Setup" },
 ] as const;
 
 function RouteComponent() {
@@ -35,6 +42,23 @@ function RouteComponent() {
               {label}
             </Link>
           ))}
+
+          <div className="mt-2">
+            <div className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700">
+              <Salad className="w-4 h-4" />
+              Nutrition
+            </div>
+            <div className="ml-7 flex flex-col gap-1">
+              {nutritionSubMenus.map((menu) => (
+                <Link
+                  key={menu.to + menu.label}
+                  to={menu.to}
+                  className="px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors [&.active]:bg-slate-100 [&.active]:text-slate-900">
+                  {menu.label}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="border-t border-slate-200 pt-4 mt-4 space-y-2">
           <div className="flex items-center gap-3 px-3 py-2 text-sm text-slate-600">
