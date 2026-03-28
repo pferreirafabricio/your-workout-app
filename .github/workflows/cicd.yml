@@ -1,8 +1,12 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: CI/CD
 on:
-  push: # Runs on pushes to any branch
+  push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch: # Allows manual triggering
 
 permissions:
@@ -42,15 +46,52 @@ jobs:
       - name: Run typecheck
         run: bun run typecheck
 
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Run unit tests
+        run: bun run test:unit
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Run integration tests (placeholder)
+        run: bun run test:integration
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Install Playwright browser dependencies
+        run: bunx playwright install --with-deps chromium
+      - name: Run e2e tests
+        run: bun run test:e2e
+
   build-and-push:
     runs-on: ubuntu-latest
-    needs: [commitlint, typecheck]
+    needs: [commitlint, typecheck, unit-tests, integration-tests, e2e-tests]
     if: >
-      github.event_name == 'push' && (
-        github.ref == 'refs/heads/main' ||
-        github.ref == 'refs/heads/test' ||
-        github.ref == 'refs/heads/staging'
-      ) || github.event_name == 'workflow_dispatch'
+      github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -75,6 +116,10 @@ jobs:
           elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
             echo "branch_tag=staging" >> $GITHUB_OUTPUT
             echo "env_tag=staging" >> $GITHUB_OUTPUT
+            echo "node_env=production" >> $GITHUB_OUTPUT
+          else
+            echo "branch_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "env_tag=manual" >> $GITHUB_OUTPUT
             echo "node_env=production" >> $GITHUB_OUTPUT
           fi
 
