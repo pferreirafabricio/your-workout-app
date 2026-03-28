@@ -85,6 +85,27 @@ export const deleteSetInputSchema = z.object({
   setId: z.string().min(1),
 });
 
+const queueDirectionSchema = z.enum(["up", "down"]);
+
+export const moveWorkoutQueueItemInputSchema = z.object({
+  movementId: z.string().min(1),
+  direction: queueDirectionSchema,
+});
+
+export const setWorkoutQueueItemSkippedInputSchema = z.object({
+  movementId: z.string().min(1),
+  skipped: z.boolean(),
+});
+
+export const activateWorkoutQueueMovementInputSchema = z.object({
+  movementId: z.string().min(1),
+});
+
+export const setWorkoutQueueItemTargetSetsInputSchema = z.object({
+  movementId: z.string().min(1),
+  targetSets: z.number().int().min(1).max(12),
+});
+
 export const createMovementInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   type: z.enum(["WEIGHTED", "BODYWEIGHT"]),

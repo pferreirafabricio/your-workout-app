@@ -10,18 +10,29 @@ describe("workouts server helpers", () => {
     expect(calculateSetVolume(82.5, 5)).toBe(412.5);
   });
 
-  it("calculates workout summary totals and duration", () => {
+  it("calculates workout summary totals and duration from first logged set", () => {
     const startedAt = new Date("2026-03-28T10:00:00.000Z");
     const completedAt = new Date("2026-03-28T10:45:15.000Z");
 
     const summary = calculateWorkoutSummary(startedAt, completedAt, [
-      { weightSnapshotKg: 100, reps: 5 },
-      { weightSnapshotKg: 80, reps: 8 },
+      { weightSnapshotKg: 100, reps: 5, loggedAt: new Date("2026-03-28T10:05:00.000Z") },
+      { weightSnapshotKg: 80, reps: 8, loggedAt: new Date("2026-03-28T10:20:00.000Z") },
     ]);
 
-    expect(summary.durationSeconds).toBe(2715);
+    expect(summary.durationSeconds).toBe(2415);
     expect(summary.totalSets).toBe(2);
     expect(summary.totalVolumeKg).toBe(1140);
+  });
+
+  it("falls back to workout start time when no sets are logged", () => {
+    const startedAt = new Date("2026-03-28T10:00:00.000Z");
+    const completedAt = new Date("2026-03-28T10:45:15.000Z");
+
+    const summary = calculateWorkoutSummary(startedAt, completedAt, []);
+
+    expect(summary.durationSeconds).toBe(2715);
+    expect(summary.totalSets).toBe(0);
+    expect(summary.totalVolumeKg).toBe(0);
   });
 
   it("builds progression series for max weight", () => {

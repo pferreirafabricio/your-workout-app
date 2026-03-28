@@ -6,16 +6,22 @@ import { Prisma } from "../../../../prisma/generated/client/client";
 import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/types";
 import { fromCanonicalKg, toCanonicalKg } from "@/lib/shared/utils";
 import {
+  activateWorkoutQueueMovementInputSchema,
   addSetInputSchema,
   deleteSetInputSchema,
+  moveWorkoutQueueItemInputSchema,
   mutationErrorMessages,
   parseOptionalDate,
   progressionSeriesInputSchema,
   recordBodyWeightInputSchema,
+  setWorkoutQueueItemSkippedInputSchema,
+  setWorkoutQueueItemTargetSetsInputSchema,
   setUserPreferencesInputSchema,
   updateSetInputSchema,
   workoutHistoryInputSchema,
 } from "@/lib/features/workouts/workout-progression";
+
+const DEFAULT_QUEUE_TARGET_SETS = 3;
 
 type ProjectedSet = {
   id: string;
@@ -38,6 +44,20 @@ type ProjectedSet = {
   volumeKg: number;
 };
 
+type ProjectedWorkoutQueueItem = {
+  id: string;
+  movementId: string;
+  position: number;
+  targetSets: number;
+  isSkipped: boolean;
+  movement: {
+    id: string;
+    name: string;
+    type: "WEIGHTED" | "BODYWEIGHT";
+    archivedAt: Date | null;
+  };
+};
+
 export type WorkoutSummary = {
   durationSeconds: number;
   totalVolumeKg: number;
@@ -51,10 +71,18 @@ export function calculateSetVolume(weightKg: number, reps: number): number {
 export function calculateWorkoutSummary(
   startedAt: Date,
   completedAt: Date,
-  sets: Array<{ weightSnapshotKg: number; reps: number }>,
+  sets: Array<{ weightSnapshotKg: number; reps: number; loggedAt: Date }>,
 ): WorkoutSummary {
+  const firstSetLoggedAt =
+    sets.length > 0
+      ? sets.reduce((earliest, set) => (set.loggedAt < earliest ? set.loggedAt : earliest), sets[0].loggedAt)
+      : null;
+
+  const effectiveStartedAt =
+    firstSetLoggedAt && firstSetLoggedAt.getTime() > startedAt.getTime() ? firstSetLoggedAt : startedAt;
+
   return {
-    durationSeconds: Math.max(0, Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)),
+    durationSeconds: Math.max(0, Math.floor((completedAt.getTime() - effectiveStartedAt.getTime()) / 1000)),
     totalVolumeKg:
       Math.round(sets.reduce((sum, set) => sum + calculateSetVolume(set.weightSnapshotKg, set.reps), 0) * 100) / 100,
     totalSets: sets.length,
@@ -134,6 +162,195 @@ function projectSetForDisplay(
   };
 }
 
+function projectWorkoutQueueItem(
+  queueItem: {
+    id: string;
+    movementId: string;
+    position: number;
+    targetSets: number;
+    isSkipped: boolean;
+    movement: {
+      id: string;
+      name: string;
+      type: "WEIGHTED" | "BODYWEIGHT";
+      archivedAt: Date | null;
+    };
+  },
+): ProjectedWorkoutQueueItem {
+  return {
+    id: queueItem.id,
+    movementId: queueItem.movementId,
+    position: queueItem.position,
+    targetSets: queueItem.targetSets,
+    isSkipped: queueItem.isSkipped,
+    movement: queueItem.movement,
+  };
+}
+
+async function syncWorkoutQueue(
+  prisma: Awaited<ReturnType<typeof getServerSidePrismaClient>>,
+  userId: string,
+  workoutId: string,
+) {
+  const activeMovements = await prisma.movement.findMany({
+    where: {
+      userId,
+      archivedAt: null,
+    },
+    select: { id: true },
+    orderBy: { name: "asc" },
+  });
+
+  const activeMovementIds = new Set(activeMovements.map((movement) => movement.id));
+
+  const existingQueueItems = await prisma.workoutQueueItem.findMany({
+    where: { workoutId },
+    orderBy: { position: "asc" },
+  });
+
+  const existingMovementIds = new Set(existingQueueItems.map((item) => item.movementId));
+  const missingMovementIds = activeMovements
+    .map((movement) => movement.id)
+    .filter((movementId) => !existingMovementIds.has(movementId));
+
+  const staleQueueItemIds = existingQueueItems
+    .filter((item) => !activeMovementIds.has(item.movementId))
+    .map((item) => item.id);
+
+  if (staleQueueItemIds.length || missingMovementIds.length) {
+    const nextPositionStart = existingQueueItems.length;
+    const createManyData = missingMovementIds.map((movementId, index) => ({
+      workoutId,
+      movementId,
+      position: nextPositionStart + index,
+      targetSets: DEFAULT_QUEUE_TARGET_SETS,
+    }));
+
+    await prisma.$transaction(async (tx) => {
+      if (staleQueueItemIds.length) {
+        await tx.workoutQueueItem.deleteMany({
+          where: { id: { in: staleQueueItemIds } },
+        });
+      }
+
+      if (createManyData.length) {
+        await tx.workoutQueueItem.createMany({
+          data: createManyData,
+          skipDuplicates: true,
+        });
+      }
+    });
+  }
+
+  const queueItems = await prisma.workoutQueueItem.findMany({
+    where: { workoutId },
+    orderBy: { position: "asc" },
+    include: {
+      movement: true,
+    },
+  });
+
+  const needsNormalization = queueItems.some((item, index) => item.position !== index);
+
+  if (needsNormalization) {
+    await reindexQueuePositions(prisma, queueItems.map((item) => item.id));
+  }
+
+  return prisma.workoutQueueItem.findMany({
+    where: { workoutId },
+    orderBy: { position: "asc" },
+    include: {
+      movement: true,
+    },
+  });
+}
+
+async function reindexQueuePositions(
+  prisma: Awaited<ReturnType<typeof getServerSidePrismaClient>>,
+  orderedQueueItemIds: string[],
+) {
+  if (!orderedQueueItemIds.length) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const [index, queueItemId] of orderedQueueItemIds.entries()) {
+      await tx.workoutQueueItem.update({
+        where: { id: queueItemId },
+        data: { position: 10_000 + index },
+      });
+    }
+
+    for (const [index, queueItemId] of orderedQueueItemIds.entries()) {
+      await tx.workoutQueueItem.update({
+        where: { id: queueItemId },
+        data: { position: index },
+      });
+    }
+  });
+}
+
+async function ensureActiveMovementId(
+  prisma: Awaited<ReturnType<typeof getServerSidePrismaClient>>,
+  workoutId: string,
+  currentActiveMovementId: string | null,
+  queueItems: Array<{ movementId: string; isSkipped: boolean }>,
+) {
+  const currentActiveIsValid = Boolean(
+    currentActiveMovementId && queueItems.some((item) => item.movementId === currentActiveMovementId && !item.isSkipped),
+  );
+
+  if (currentActiveIsValid) {
+    return currentActiveMovementId;
+  }
+
+  const nextActiveMovementId =
+    queueItems.find((item) => !item.isSkipped)?.movementId ?? queueItems[0]?.movementId ?? null;
+
+  if (nextActiveMovementId !== currentActiveMovementId) {
+    await prisma.workout.update({
+      where: { id: workoutId },
+      data: { activeMovementId: nextActiveMovementId },
+    });
+  }
+
+  return nextActiveMovementId;
+}
+
+async function ensureQueueItemExists(
+  prisma: Awaited<ReturnType<typeof getServerSidePrismaClient>>,
+  workoutId: string,
+  movementId: string,
+) {
+  const existing = await prisma.workoutQueueItem.findUnique({
+    where: {
+      workoutId_movementId: {
+        workoutId,
+        movementId,
+      },
+    },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const lastQueueItem = await prisma.workoutQueueItem.findFirst({
+    where: { workoutId },
+    select: { position: true },
+    orderBy: { position: "desc" },
+  });
+
+  return prisma.workoutQueueItem.create({
+    data: {
+      workoutId,
+      movementId,
+      position: (lastQueueItem?.position ?? -1) + 1,
+      targetSets: DEFAULT_QUEUE_TARGET_SETS,
+    },
+  });
+}
+
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([csrfProtectionMiddleware, authMiddleware])
   .handler(async ({ context }) => {
@@ -145,6 +362,8 @@ export const createWorkoutServerFn = createServerFn({ method: "POST" })
     });
 
     if (existing) {
+      const queueItems = await syncWorkoutQueue(prisma, context.user.id, existing.id);
+      await ensureActiveMovementId(prisma, existing.id, existing.activeMovementId, queueItems);
       return { success: true as const, workout: existing, reusedExisting: true as const };
     }
 
@@ -154,6 +373,9 @@ export const createWorkoutServerFn = createServerFn({ method: "POST" })
         startedAt: new Date(),
       },
     });
+
+    const queueItems = await syncWorkoutQueue(prisma, context.user.id, workout.id);
+    await ensureActiveMovementId(prisma, workout.id, workout.activeMovementId, queueItems);
 
     return { success: true as const, workout, reusedExisting: false as const };
   });
@@ -206,6 +428,9 @@ export const getCurrentWorkoutServerFn = createServerFn()
       return null;
     }
 
+    const queueItems = await syncWorkoutQueue(prisma, context.user.id, workout.id);
+    const activeMovementId = await ensureActiveMovementId(prisma, workout.id, workout.activeMovementId, queueItems);
+
     const projectedSets = workout.sets.map((set: any) => projectSetForDisplay(set, preferredUnit));
     const totalVolumeKg = projectedSets.reduce((sum: number, set: ProjectedSet) => sum + set.volumeKg, 0);
     const lastSet = workout.sets[workout.sets.length - 1] ?? null;
@@ -216,6 +441,8 @@ export const getCurrentWorkoutServerFn = createServerFn()
       startedAt: workout.startedAt,
       completedAt: workout.completedAt,
       preferredWeightUnit: preferredUnit,
+      activeMovementId,
+      queue: queueItems.map(projectWorkoutQueueItem),
       restTargetSeconds: preference.defaultRestTargetSeconds ?? DEFAULT_REST_TARGET_SECONDS,
       lastSetLoggedAt: lastSet?.loggedAt ?? null,
       sets: projectedSets,
@@ -282,6 +509,8 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       return { success: false as const, error: mutationErrorMessages.movementArchived };
     }
 
+    await ensureQueueItemExists(prisma, workout.id, movement.id);
+
     const latestBodyWeight = await prisma.bodyWeightEntry.findFirst({
       where: { userId: context.user.id },
       orderBy: { recordedAt: "desc" },
@@ -318,10 +547,174 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       include: { movement: true },
     });
 
+    if (!workout.activeMovementId) {
+      await prisma.workout.update({
+        where: { id: workout.id },
+        data: { activeMovementId: movement.id },
+      });
+    }
+
     return {
       success: true as const,
       set: projectSetForDisplay(set, preferredUnit),
     };
+  });
+
+export const moveWorkoutQueueItemServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware, authMiddleware])
+  .inputValidator(moveWorkoutQueueItemInputSchema)
+  .handler(async ({ context, data }) => {
+    const prisma = await getServerSidePrismaClient();
+
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: null },
+      select: { id: true },
+    });
+
+    if (!workout) {
+      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+    }
+
+    const queueItems = await prisma.workoutQueueItem.findMany({
+      where: { workoutId: workout.id },
+      orderBy: { position: "asc" },
+    });
+
+    const currentIndex = queueItems.findIndex((item) => item.movementId === data.movementId);
+    if (currentIndex < 0) {
+      return { success: false as const, error: mutationErrorMessages.validationError };
+    }
+
+    const targetIndex = data.direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= queueItems.length) {
+      return { success: true as const };
+    }
+
+    const currentItem = queueItems[currentIndex];
+    const targetItem = queueItems[targetIndex];
+
+    const nextOrder = queueItems.map((item) => item.id);
+    nextOrder[currentIndex] = targetItem.id;
+    nextOrder[targetIndex] = currentItem.id;
+
+    await reindexQueuePositions(prisma, nextOrder);
+
+    return { success: true as const };
+  });
+
+export const setWorkoutQueueItemSkippedServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware, authMiddleware])
+  .inputValidator(setWorkoutQueueItemSkippedInputSchema)
+  .handler(async ({ context, data }) => {
+    const prisma = await getServerSidePrismaClient();
+
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: null },
+      select: { id: true, activeMovementId: true },
+    });
+
+    if (!workout) {
+      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+    }
+
+    const queueItem = await prisma.workoutQueueItem.findUnique({
+      where: {
+        workoutId_movementId: {
+          workoutId: workout.id,
+          movementId: data.movementId,
+        },
+      },
+    });
+
+    if (!queueItem) {
+      return { success: false as const, error: mutationErrorMessages.validationError };
+    }
+
+    await prisma.workoutQueueItem.update({
+      where: { id: queueItem.id },
+      data: { isSkipped: data.skipped },
+    });
+
+    const queueItems = await prisma.workoutQueueItem.findMany({
+      where: { workoutId: workout.id },
+      orderBy: { position: "asc" },
+      select: { movementId: true, isSkipped: true },
+    });
+
+    await ensureActiveMovementId(prisma, workout.id, workout.activeMovementId, queueItems);
+
+    return { success: true as const };
+  });
+
+export const setWorkoutQueueItemTargetSetsServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware, authMiddleware])
+  .inputValidator(setWorkoutQueueItemTargetSetsInputSchema)
+  .handler(async ({ context, data }) => {
+    const prisma = await getServerSidePrismaClient();
+
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: null },
+      select: { id: true },
+    });
+
+    if (!workout) {
+      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+    }
+
+    const queueItem = await prisma.workoutQueueItem.findUnique({
+      where: {
+        workoutId_movementId: {
+          workoutId: workout.id,
+          movementId: data.movementId,
+        },
+      },
+    });
+
+    if (!queueItem) {
+      return { success: false as const, error: mutationErrorMessages.validationError };
+    }
+
+    await prisma.workoutQueueItem.update({
+      where: { id: queueItem.id },
+      data: { targetSets: data.targetSets },
+    });
+
+    return { success: true as const };
+  });
+
+export const activateWorkoutQueueMovementServerFn = createServerFn({ method: "POST" })
+  .middleware([csrfProtectionMiddleware, authMiddleware])
+  .inputValidator(activateWorkoutQueueMovementInputSchema)
+  .handler(async ({ context, data }) => {
+    const prisma = await getServerSidePrismaClient();
+
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: null },
+      select: { id: true },
+    });
+
+    if (!workout) {
+      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+    }
+
+    await ensureQueueItemExists(prisma, workout.id, data.movementId);
+
+    await prisma.workoutQueueItem.update({
+      where: {
+        workoutId_movementId: {
+          workoutId: workout.id,
+          movementId: data.movementId,
+        },
+      },
+      data: { isSkipped: false },
+    });
+
+    await prisma.workout.update({
+      where: { id: workout.id },
+      data: { activeMovementId: data.movementId },
+    });
+
+    return { success: true as const };
   });
 
 export const updateSetServerFn = createServerFn({ method: "POST" })

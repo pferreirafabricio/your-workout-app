@@ -38,6 +38,8 @@ model Movement {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   sets        Set[]
+  activeInWorkouts Workout[] @relation("ActiveWorkoutMovement")
+  queueItems   WorkoutQueueItem[]
 
   @@index([userId, archivedAt])
   @@index([equipmentId, archivedAt])
@@ -49,13 +51,17 @@ model Workout {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   id          String   @id @default(uuid())
   name        String?
+  activeMovementId String?
+  activeMovement Movement? @relation("ActiveWorkoutMovement", fields: [activeMovementId], references: [id], onDelete: SetNull)
   startedAt   DateTime @default(now())
   completedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   sets        Set[]
+  queueItems  WorkoutQueueItem[]
 
   @@index([userId, completedAt, startedAt])
+  @@index([activeMovementId])
 }
 
 model Set {
@@ -76,6 +82,24 @@ model Set {
 
   @@index([workoutId, loggedAt])
   @@index([movementId, loggedAt])
+}
+
+model WorkoutQueueItem {
+  id         String   @id @default(uuid())
+  workoutId  String
+  workout    Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  movementId String
+  movement   Movement @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  position   Int
+  targetSets Int      @default(3)
+  isSkipped  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([workoutId, movementId])
+  @@unique([workoutId, position])
+  @@index([movementId])
+  @@index([workoutId, isSkipped, position])
 }
 
 model UserPreference {

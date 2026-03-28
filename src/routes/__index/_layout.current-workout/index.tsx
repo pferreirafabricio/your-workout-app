@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { AddButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
@@ -6,13 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
+  activateWorkoutQueueMovementServerFn,
   createWorkoutServerFn,
   completeWorkoutServerFn,
   addSetServerFn,
+  moveWorkoutQueueItemServerFn,
+  setWorkoutQueueItemSkippedServerFn,
+  setWorkoutQueueItemTargetSetsServerFn,
   updateSetServerFn,
   deleteSetServerFn,
 } from "@/lib/features/workouts/workouts.server";
-import { Play, Check, X } from "lucide-react";
+import { Play, Check, X, ArrowUp, ArrowDown, CircleDot, Minus, Plus } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   bodyWeightSeriesQueryOptions,
@@ -56,6 +60,24 @@ function CurrentWorkoutPage() {
     durationSeconds: number;
     totalVolumeKg: number;
   } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  const applyMovementSelection = (movementId: string) => {
+    setSelectedMovement(movementId);
+    setSetFormError("");
+
+    const movement = movements.find((item: { id: string; type: string }) => item.id === movementId);
+    if (movement?.type === "BODYWEIGHT") {
+      if (latestBodyWeight) {
+        setWeight(String(latestBodyWeight.weight));
+      } else {
+        setWeight("");
+      }
+      return;
+    }
+
+    setWeight("");
+  };
 
   const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
   const isSelectedMovementBodyweight = selectedMovementRecord?.type === "BODYWEIGHT";
@@ -103,12 +125,39 @@ function CurrentWorkoutPage() {
         toast.error(message);
         return;
       }
+
+      const nextSetCounts = new Map<string, number>();
+      for (const set of workout?.sets ?? []) {
+        nextSetCounts.set(set.movementId, (nextSetCounts.get(set.movementId) ?? 0) + 1);
+      }
+      nextSetCounts.set(response.set.movementId, (nextSetCounts.get(response.set.movementId) ?? 0) + 1);
+
+      const nextQueueMovement = (workout?.queue ?? []).find((queueItem: {
+        movementId: string;
+        isSkipped: boolean;
+        targetSets: number;
+      }) => {
+        if (queueItem.isSkipped) {
+          return false;
+        }
+        const completedSets = nextSetCounts.get(queueItem.movementId) ?? 0;
+        return completedSets < queueItem.targetSets;
+      });
+
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       setReps("");
       setWeight("");
       setRpe("");
       setNotes("");
       setSetFormError("");
+
+      if (nextQueueMovement) {
+        applyMovementSelection(nextQueueMovement.movementId);
+        if (workout?.activeMovementId !== nextQueueMovement.movementId) {
+          activateQueueMovementMutation.mutate(nextQueueMovement.movementId);
+        }
+      }
+
       toast.success("Set added.");
     },
   });
@@ -149,6 +198,79 @@ function CurrentWorkoutPage() {
       toast.success("Set deleted.");
     },
   });
+
+  const moveQueueItemMutation = useMutation({
+    mutationFn: (data: { movementId: string; direction: "up" | "down" }) =>
+      moveWorkoutQueueItemServerFn({ data, headers: getCsrfHeaders() }),
+    onSuccess: (response) => {
+      if (!response.success) {
+        toast.error(response.error ?? "Unable to move queue item.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    },
+  });
+
+  const setQueueItemSkippedMutation = useMutation({
+    mutationFn: (data: { movementId: string; skipped: boolean }) =>
+      setWorkoutQueueItemSkippedServerFn({ data, headers: getCsrfHeaders() }),
+    onSuccess: (response) => {
+      if (!response.success) {
+        toast.error(response.error ?? "Unable to update queue item.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    },
+  });
+
+  const activateQueueMovementMutation = useMutation({
+    mutationFn: (movementId: string) =>
+      activateWorkoutQueueMovementServerFn({ data: { movementId }, headers: getCsrfHeaders() }),
+    onSuccess: (response, movementId) => {
+      if (!response.success) {
+        toast.error(response.error ?? "Unable to activate movement.");
+        return;
+      }
+      applyMovementSelection(movementId);
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    },
+  });
+
+  const setQueueTargetSetsMutation = useMutation({
+    mutationFn: (data: { movementId: string; targetSets: number }) =>
+      setWorkoutQueueItemTargetSetsServerFn({ data, headers: getCsrfHeaders() }),
+    onSuccess: (response) => {
+      if (!response.success) {
+        toast.error(response.error ?? "Unable to update target sets.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    },
+  });
+
+  useEffect(() => {
+    if (!workout?.lastSetLoggedAt) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [workout?.lastSetLoggedAt]);
+
+  useEffect(() => {
+    if (!workout) {
+      return;
+    }
+
+    if (!selectedMovement && workout.activeMovementId) {
+      setSelectedMovement(workout.activeMovementId);
+    }
+  }, [selectedMovement, workout]);
 
   const handleAddSet = (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,11 +329,16 @@ function CurrentWorkoutPage() {
   };
 
   const canCompleteWorkout = Boolean(workout && workout.sets.length > 0);
+  const restTargetSeconds = workout?.restTargetSeconds ?? 0;
   const restElapsedSeconds =
     workout?.lastSetLoggedAt
-      ? Math.max(0, Math.floor((Date.now() - new Date(workout.lastSetLoggedAt).getTime()) / 1000))
+      ? Math.max(0, Math.floor((nowMs - new Date(workout.lastSetLoggedAt).getTime()) / 1000))
       : 0;
-  const restTargetReached = Boolean(workout?.lastSetLoggedAt && restElapsedSeconds >= workout.restTargetSeconds);
+  const restTargetReached = Boolean(workout?.lastSetLoggedAt && restElapsedSeconds >= restTargetSeconds);
+  const restRemainingSeconds = Math.max(0, restTargetSeconds - restElapsedSeconds);
+  const restProgress = workout?.lastSetLoggedAt
+    ? Math.min(1, restElapsedSeconds / Math.max(1, restTargetSeconds))
+    : 0;
 
   const activeUnit = preferences.weightUnit;
   let weightPlaceholder = `Weight (${activeUnit})`;
@@ -221,23 +348,22 @@ function CurrentWorkoutPage() {
       : "Record bodyweight first in Settings";
   }
 
-  const movementOptions = movements.filter((movement: { archivedAt: Date | null }) => !movement.archivedAt);
+  const activeQueueMovementIds = (workout?.queue ?? [])
+    .filter((queueItem: { isSkipped: boolean }) => !queueItem.isSkipped)
+    .map((queueItem: { movementId: string }) => queueItem.movementId);
+
+  const movementById = new Map(movements.map((movement) => [movement.id, movement]));
+  const queuedMovementOptions = activeQueueMovementIds
+    .map((movementId: string) => movementById.get(movementId))
+    .filter((movement): movement is (typeof movements)[number] => Boolean(movement && !movement.archivedAt));
+
+  const movementOptions =
+    queuedMovementOptions.length > 0
+      ? queuedMovementOptions
+      : movements.filter((movement: { archivedAt: Date | null }) => !movement.archivedAt);
 
   const handleMovementChange = (movementId: string) => {
-    setSelectedMovement(movementId);
-    setSetFormError("");
-
-    const movement = movements.find((item: { id: string; type: string }) => item.id === movementId);
-    if (movement?.type === "BODYWEIGHT") {
-      if (latestBodyWeight) {
-        setWeight(String(latestBodyWeight.weight));
-      } else {
-        setWeight("");
-      }
-      return;
-    }
-
-    setWeight("");
+    applyMovementSelection(movementId);
   };
 
   const openEditor = (set: {
@@ -294,18 +420,54 @@ function CurrentWorkoutPage() {
     );
   }
 
+  const queueMutationIsPending =
+    moveQueueItemMutation.isPending ||
+    setQueueItemSkippedMutation.isPending ||
+    activateQueueMovementMutation.isPending ||
+    setQueueTargetSetsMutation.isPending;
+
+  const setCountsByMovementId = new Map<string, number>();
+  for (const set of workout.sets) {
+    setCountsByMovementId.set(set.movementId, (setCountsByMovementId.get(set.movementId) ?? 0) + 1);
+  }
+
+  const requiredQueueItems = workout.queue.filter((queueItem: { isSkipped: boolean }) => !queueItem.isSkipped);
+  const isQueueComplete =
+    requiredQueueItems.length > 0 &&
+    requiredQueueItems.every((queueItem: { movementId: string; targetSets: number }) => {
+      const completedSets = setCountsByMovementId.get(queueItem.movementId) ?? 0;
+      return completedSets >= queueItem.targetSets;
+    });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
         <Button
-          variant="outline"
+          variant={isQueueComplete ? "default" : "outline"}
           onClick={() => completeWorkoutMutation.mutate()}
           disabled={completeWorkoutMutation.isPending || !canCompleteWorkout}>
           <Check className="w-4 h-4 mr-2" />
-          {completeWorkoutMutation.isPending ? "Completing..." : "Complete Workout"}
+          {completeWorkoutMutation.isPending ? "Completing..." : isQueueComplete ? "Complete Workout (Ready)" : "Complete Workout"}
         </Button>
       </div>
+
+      {isQueueComplete && (
+        <Card>
+          <CardContent className="py-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-emerald-700 font-medium">
+              You hit all queue targets. You can complete this workout now.
+            </p>
+            <Button
+              size="sm"
+              onClick={() => completeWorkoutMutation.mutate()}
+              disabled={completeWorkoutMutation.isPending}>
+              <Check className="h-4 w-4 mr-2" />
+              Finish Workout
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {setFormError && (
         <Card>
@@ -314,13 +476,140 @@ function CurrentWorkoutPage() {
       )}
 
       <Card>
-        <CardContent className="py-3 text-sm text-slate-700 flex items-center justify-between">
-          <span>
-            Rest timer: {restElapsedSeconds}s / target {workout.restTargetSeconds}s
+        <CardContent className="py-5 px-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              className="h-24 w-24 rounded-full grid place-items-center text-slate-900 text-sm font-semibold"
+              style={{
+                background: `conic-gradient(${restTargetReached ? "#059669" : "#0f766e"} ${Math.round(restProgress * 360)}deg, #e2e8f0 0deg)`,
+              }}>
+              <div className="h-[4.8rem] w-[4.8rem] rounded-full bg-white grid place-items-center leading-tight text-center">
+                <div>{workout.lastSetLoggedAt ? `${restRemainingSeconds}s` : "Ready"}</div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">Rest timer</p>
+              <p className="text-base font-semibold text-slate-900">
+                {workout.lastSetLoggedAt ? `${restElapsedSeconds}s elapsed` : "Starts after your first set"}
+              </p>
+              <p className="text-sm text-slate-600">Target: {workout.restTargetSeconds}s</p>
+            </div>
+          </div>
+          <span className={restTargetReached ? "text-emerald-600 font-semibold" : "text-slate-500 font-medium"}>
+            {workout.lastSetLoggedAt ? (restTargetReached ? "Target reached" : "Keep resting") : "No active rest interval"}
           </span>
-          <span className={restTargetReached ? "text-emerald-600 font-semibold" : "text-slate-500"}>
-            {restTargetReached ? "Target reached" : "Keep resting"}
-          </span>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CircleDot className="h-4 w-4" />
+            Queue Mode
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {workout.queue.length === 0 ? (
+            <p className="text-sm text-slate-500">No queued movements yet. Create a movement to begin.</p>
+          ) : (
+            <ul className="space-y-2">
+              {workout.queue.map((queueItem: {
+                id: string;
+                movementId: string;
+                targetSets: number;
+                isSkipped: boolean;
+                movement: { name: string };
+              }, index: number) => {
+                const isActive = workout.activeMovementId === queueItem.movementId;
+                const completedSets = setCountsByMovementId.get(queueItem.movementId) ?? 0;
+                const isCompleted = completedSets >= queueItem.targetSets && !queueItem.isSkipped;
+                return (
+                  <li
+                    key={queueItem.id}
+                    className={`rounded-lg border px-3 py-2 flex items-center justify-between ${isActive ? "border-teal-500 bg-teal-50" : "border-slate-200 bg-white"}`}>
+                    <div>
+                      <p className={`font-medium ${queueItem.isSkipped ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                        {index + 1}. {queueItem.movement.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {completedSets}/{queueItem.targetSets} sets
+                      </p>
+                      {isActive && <p className="text-xs text-teal-700">Active movement</p>}
+                      {isCompleted && (
+                        <p className="text-xs text-emerald-700 font-medium inline-flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          Completed
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setQueueTargetSetsMutation.mutate({
+                            movementId: queueItem.movementId,
+                            targetSets: Math.max(1, queueItem.targetSets - 1),
+                          })
+                        }
+                        disabled={queueMutationIsPending || queueItem.targetSets <= 1}
+                        aria-label="Decrease target sets">
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setQueueTargetSetsMutation.mutate({
+                            movementId: queueItem.movementId,
+                            targetSets: Math.min(12, queueItem.targetSets + 1),
+                          })
+                        }
+                        disabled={queueMutationIsPending || queueItem.targetSets >= 12}
+                        aria-label="Increase target sets">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "up" })}
+                        disabled={queueMutationIsPending || index === 0}
+                        aria-label="Move up">
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "down" })}
+                        disabled={queueMutationIsPending || index === workout.queue.length - 1}
+                        aria-label="Move down">
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={isActive ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => activateQueueMovementMutation.mutate(queueItem.movementId)}
+                        disabled={queueMutationIsPending || isActive}>
+                        {isActive ? "Active" : "Set Active"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setQueueItemSkippedMutation.mutate({
+                            movementId: queueItem.movementId,
+                            skipped: !queueItem.isSkipped,
+                          })
+                        }
+                        disabled={queueMutationIsPending}>
+                        {queueItem.isSkipped ? "Unskip" : "Skip"}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
