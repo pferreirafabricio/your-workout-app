@@ -7,11 +7,12 @@ import { Trash2, X } from "lucide-react";
 import {
   bodyWeightHistoryQueryOptions,
   progressionSeriesQueryOptions,
+  userPreferencesQueryOptions,
   workoutHistoryQueryOptions,
 } from "./-queries/workout-history";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Select } from "@/components/ui/select";
-import { formatDateTime, formatNumber, formatWeight } from "@/lib/shared/utils";
+import { formatDate, formatDateKey, formatDateTime, formatNumber, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
@@ -32,7 +33,7 @@ type WorkoutRow = {
 };
 
 type SeriesPoint = {
-  date: string | Date;
+  date: string;
   value: number;
 };
 
@@ -47,6 +48,7 @@ export const Route = createFileRoute("/__index/_layout/workout-history/")({
     await Promise.all([
       context.queryClient.ensureQueryData(workoutHistoryQueryOptions()),
       context.queryClient.ensureQueryData(bodyWeightHistoryQueryOptions()),
+      context.queryClient.ensureQueryData(userPreferencesQueryOptions()),
     ]);
   },
   component: WorkoutHistoryPage,
@@ -56,6 +58,7 @@ function WorkoutHistoryPage() {
   const queryClient = useQueryClient();
   const { data: workouts } = useSuspenseQuery(workoutHistoryQueryOptions());
   const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightHistoryQueryOptions());
+  const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions());
   const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedMovementId, setSelectedMovementId] = useState("");
@@ -64,6 +67,10 @@ function WorkoutHistoryPage() {
   const { data: progressionSeries = [] } = useQuery(
     progressionSeriesQueryOptions(selectedMovementId, selectedMetric),
   );
+  const timeZone = preferences.timeZone;
+  const hasMovementSelected = selectedMovementId.length > 0;
+  const progressionItems = progressionSeries as SeriesPoint[];
+  const hasProgressionPoints = progressionItems.length > 0;
 
   const deleteWorkoutsMutation = useMutation({
     mutationFn: (workoutIds: string[]) =>
@@ -143,8 +150,13 @@ function WorkoutHistoryPage() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-sm font-medium text-slate-700">Movement</label>
-              <Select value={selectedMovementId} onChange={(event) => setSelectedMovementId(event.target.value)}>
+              <label className="text-sm font-medium text-slate-700" htmlFor="progression-movement">
+                Movement
+              </label>
+              <Select
+                id="progression-movement"
+                value={selectedMovementId}
+                onChange={(event) => setSelectedMovementId(event.target.value)}>
                 <option value="">Select movement</option>
                 {uniqueMovements.map(([id, name]) => (
                   <option key={id} value={id}>
@@ -154,8 +166,11 @@ function WorkoutHistoryPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Metric</label>
+              <label className="text-sm font-medium text-slate-700" htmlFor="progression-metric">
+                Metric
+              </label>
               <Select
+                id="progression-metric"
                 value={selectedMetric}
                 onChange={(event) =>
                   setSelectedMetric(event.target.value as "maxWeight" | "totalReps" | "totalVolume")
@@ -167,15 +182,15 @@ function WorkoutHistoryPage() {
             </div>
           </div>
 
-          {!selectedMovementId ? (
-            <p className="text-sm text-slate-500">Select a movement to view progression points.</p>
-          ) : progressionSeries.length === 0 ? (
+          {!hasMovementSelected && <p className="text-sm text-slate-500">Select a movement to view progression points.</p>}
+          {hasMovementSelected && !hasProgressionPoints && (
             <p className="text-sm text-slate-500">No progression points for this selection.</p>
-          ) : (
+          )}
+          {hasMovementSelected && hasProgressionPoints && (
             <ul className="space-y-2 text-sm text-slate-700">
-              {(progressionSeries as SeriesPoint[]).map((point) => (
+              {progressionItems.map((point) => (
                 <li key={`${point.date}-${point.value}`} className="bg-slate-50 rounded-lg px-3 py-2 flex justify-between">
-                  <span>{formatDateTime(point.date)}</span>
+                  <span>{formatDateKey(point.date)}</span>
                   <span className="font-medium">{formatNumber(point.value)}</span>
                 </li>
               ))}
@@ -195,7 +210,7 @@ function WorkoutHistoryPage() {
             <ul className="space-y-2 text-sm text-slate-700">
               {(bodyWeightSeries as BodyWeightPoint[]).map((point) => (
                 <li key={`${point.date}-${point.weight}`} className="bg-slate-50 rounded-lg px-3 py-2 flex justify-between">
-                  <span>{formatDateTime(point.date)}</span>
+                  <span>{formatDateTime(point.date, { timeZone })}</span>
                   <span className="font-medium">{formatWeight(point.weight, point.weightUnit)}</span>
                 </li>
               ))}
@@ -265,11 +280,7 @@ function WorkoutHistoryPage() {
                         </td>
                         <td className="py-3 px-4 text-slate-500">
                           {workout.completedAt
-                            ? new Date(workout.completedAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
+                            ? formatDate(workout.completedAt, { timeZone })
                             : "-"}
                         </td>
                         <td className="py-3 px-4 text-right text-slate-600">{workout.sets.length}</td>

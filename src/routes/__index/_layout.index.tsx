@@ -12,6 +12,18 @@ import { formatDateTime, formatWeight } from "@/lib/shared/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
 
+const COMMON_TIME_ZONES = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
 export const Route = createFileRoute("/__index/_layout/")({
   loader: async ({ context }) => {
     await Promise.all([
@@ -26,14 +38,17 @@ function IndexPage() {
   const queryClient = useQueryClient();
   const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions());
   const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightSeriesQueryOptions());
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   const [unit, setUnit] = useState<"kg" | "lbs">(preferences.weightUnit);
   const [restTarget, setRestTarget] = useState(String(preferences.defaultRestTargetSeconds ?? 120));
+  const [timeZone, setTimeZone] = useState(preferences.timeZone ?? browserTimeZone);
+  const isCustomTimeZone = COMMON_TIME_ZONES.includes(timeZone) === false;
   const [bodyWeight, setBodyWeight] = useState("");
   const [error, setError] = useState("");
 
   const preferencesMutation = useMutation({
-    mutationFn: (payload: { weightUnit: "kg" | "lbs"; defaultRestTargetSeconds: number | null }) =>
+    mutationFn: (payload: { weightUnit: "kg" | "lbs"; defaultRestTargetSeconds: number | null; timeZone: string }) =>
       setUserPreferencesServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
@@ -45,6 +60,10 @@ function IndexPage() {
       setError("");
       queryClient.invalidateQueries({ queryKey: userPreferencesQueryOptions().queryKey });
       queryClient.invalidateQueries({ queryKey: ["current-workout"] });
+      queryClient.invalidateQueries({ queryKey: ["workout-history"] });
+      queryClient.invalidateQueries({ queryKey: ["progression-series"] });
+      queryClient.invalidateQueries({ queryKey: ["body-weight-history"] });
+      queryClient.invalidateQueries({ queryKey: ["body-weight-series"] });
       toast.success("Preferences saved.");
     },
   });
@@ -72,6 +91,7 @@ function IndexPage() {
     const parsed = setUserPreferencesInputSchema.safeParse({
       weightUnit: unit,
       defaultRestTargetSeconds: restTarget.trim() === "" ? null : Number(restTarget),
+      timeZone,
     });
 
     if (!parsed.success) {
@@ -119,22 +139,49 @@ function IndexPage() {
           <CardTitle>Preferences</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={savePreferences} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <form onSubmit={savePreferences} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
             <div>
-              <label className="text-sm font-medium text-slate-700">Weight unit</label>
-              <Select value={unit} onChange={(event) => setUnit(event.target.value as "kg" | "lbs")}> 
+              <label className="text-sm font-medium text-slate-700" htmlFor="preference-weight-unit">
+                Weight unit
+              </label>
+              <Select id="preference-weight-unit" value={unit} onChange={(event) => setUnit(event.target.value as "kg" | "lbs")}> 
                 <option value="kg">kg</option>
                 <option value="lbs">lbs</option>
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Default rest target (seconds)</label>
-              <Input type="number" min={15} max={600} value={restTarget} onChange={(event) => setRestTarget(event.target.value)} />
+              <label className="text-sm font-medium text-slate-700" htmlFor="preference-rest-target">
+                Default rest target (seconds)
+              </label>
+              <Input
+                id="preference-rest-target"
+                type="number"
+                min={15}
+                max={600}
+                value={restTarget}
+                onChange={(event) => setRestTarget(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700" htmlFor="preference-time-zone">
+                Timezone
+              </label>
+              <Select id="preference-time-zone" value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>
+                {COMMON_TIME_ZONES.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+                {isCustomTimeZone ? (
+                  <option value={timeZone}>{timeZone}</option>
+                ) : null}
+              </Select>
             </div>
             <SaveButton type="submit" disabled={preferencesMutation.isPending} isLoading={preferencesMutation.isPending}>
               Save Preferences
             </SaveButton>
           </form>
+          <p className="text-xs text-slate-500 mt-3">Timestamps are stored in UTC and displayed in your selected timezone.</p>
         </CardContent>
       </Card>
 
@@ -167,7 +214,7 @@ function IndexPage() {
           {latestBodyWeight ? (
             <p className="text-sm text-slate-600 mt-4">
               Latest entry: {formatWeight(latestBodyWeight.weight, latestBodyWeight.weightUnit)} at {" "}
-              {formatDateTime(latestBodyWeight.date)}
+              {formatDateTime(latestBodyWeight.date, { timeZone })}
             </p>
           ) : (
             <p className="text-sm text-slate-500 mt-4">No bodyweight entries yet.</p>

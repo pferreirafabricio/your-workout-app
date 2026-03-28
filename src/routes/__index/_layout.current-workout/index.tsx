@@ -21,7 +21,7 @@ import {
   userPreferencesQueryOptions,
 } from "./-queries/current-workout";
 import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
-import { formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
+import { formatDate, formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/csrf.client";
 import { toast } from "sonner";
@@ -327,11 +327,14 @@ function CurrentWorkoutPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
+            {formatDate(new Date(), {
+              timeZone: preferences.timeZone,
+              formatOptions: {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              },
             })}
           </CardTitle>
         </CardHeader>

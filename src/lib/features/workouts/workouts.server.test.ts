@@ -65,6 +65,34 @@ describe("workouts server helpers", () => {
     expect(series[0]?.value).toBe(1120);
   });
 
+  it("groups progression points by user timezone calendar day", () => {
+    const series = buildProgressionSeries(
+      [
+        { loggedAt: new Date("2026-03-28T00:30:00.000Z"), reps: 5, weightSnapshotKg: 80 },
+        { loggedAt: new Date("2026-03-28T08:30:00.000Z"), reps: 5, weightSnapshotKg: 90 },
+      ],
+      "maxWeight",
+      "America/Los_Angeles",
+    );
+
+    expect(series).toHaveLength(2);
+    expect(series[0]?.date).toBe("2026-03-27");
+    expect(series[0]?.value).toBe(80);
+    expect(series[1]?.date).toBe("2026-03-28");
+    expect(series[1]?.value).toBe(90);
+  });
+
+  it("falls back to UTC grouping for invalid timezone", () => {
+    const series = buildProgressionSeries(
+      [{ loggedAt: new Date("2026-03-28T00:30:00.000Z"), reps: 5, weightSnapshotKg: 80 }],
+      "maxWeight",
+      "Invalid/Timezone",
+    );
+
+    expect(series).toHaveLength(1);
+    expect(series[0]?.date).toBe("2026-03-28");
+  });
+
   it("handles rest elapsed baseline edge (same start/end)", () => {
     const now = new Date("2026-03-28T10:00:00.000Z");
     const summary = calculateWorkoutSummary(now, now, []);

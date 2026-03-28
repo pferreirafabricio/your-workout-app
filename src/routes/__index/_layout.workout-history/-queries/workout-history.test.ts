@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/features/workouts/workouts.server", () => ({
   getBodyWeightSeriesServerFn: vi.fn(async () => [{ date: "2026-03-01", weight: 80 }]),
   getProgressionSeriesServerFn: vi.fn(async () => [{ date: "2026-03-01", value: 100 }]),
+  getUserPreferencesServerFn: vi.fn(async () => ({ weightUnit: "kg", defaultRestTargetSeconds: 120, timeZone: "UTC" })),
   getWorkoutHistoryServerFn: vi.fn(async () => [{ id: "w1", sets: [] }]),
 }));
 
 import {
   bodyWeightHistoryQueryOptions,
   progressionSeriesQueryOptions,
+  userPreferencesQueryOptions,
   workoutHistoryQueryOptions,
 } from "./workout-history";
 
@@ -34,5 +36,15 @@ describe("workout history query options", () => {
     const options = bodyWeightHistoryQueryOptions();
     expect(options.queryKey).toEqual(["body-weight-history"]);
     await expect(options.queryFn?.({ queryKey: options.queryKey } as never)).resolves.toEqual([{ date: "2026-03-01", weight: 80 }]);
+  });
+
+  it("builds user preferences query option", async () => {
+    const options = userPreferencesQueryOptions();
+    expect(options.queryKey).toEqual(["user-preferences"]);
+    await expect(options.queryFn?.({ queryKey: options.queryKey } as never)).resolves.toEqual({
+      weightUnit: "kg",
+      defaultRestTargetSeconds: 120,
+      timeZone: "UTC",
+    });
   });
 });

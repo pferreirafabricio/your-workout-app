@@ -36,9 +36,24 @@ const isoDate = z
   .or(z.string().datetime())
   .or(z.string().min(1));
 
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const setUserPreferencesInputSchema = z.object({
   weightUnit: z.enum(WEIGHT_UNITS),
   defaultRestTargetSeconds: z.number().int().min(MIN_REST_TARGET_SECONDS).max(MAX_REST_TARGET_SECONDS).nullable(),
+  timeZone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine((value) => isValidTimeZone(value), { message: "Invalid timezone." }),
 });
 
 export const recordBodyWeightInputSchema = z.object({
@@ -150,7 +165,7 @@ export function parseOptionalDate(dateInput?: string): Date | undefined {
 
   const parsed = new Date(dateInput);
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error("VALIDATION_ERROR");
+    throw new TypeError("VALIDATION_ERROR");
   }
   return parsed;
 }

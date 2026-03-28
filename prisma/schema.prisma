@@ -83,6 +83,7 @@ model UserPreference {
   user                     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   weightUnit               WeightUnit @default(KG)
   defaultRestTargetSeconds Int?
+  timeZone                 String     @default("UTC")
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 }

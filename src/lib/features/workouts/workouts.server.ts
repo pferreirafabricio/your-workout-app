@@ -85,6 +85,7 @@ async function getOrCreateUserPreference(prisma: Awaited<ReturnType<typeof getSe
         userId,
         weightUnit: "KG",
         defaultRestTargetSeconds: DEFAULT_REST_TARGET_SECONDS,
+        timeZone: "UTC",
       },
     });
   } catch (error) {
@@ -286,7 +287,10 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       orderBy: { recordedAt: "desc" },
     });
 
-    let weightSnapshotKg = data.weight !== undefined ? toCanonicalKg(data.weight, preferredUnit) : 0;
+    let weightSnapshotKg = 0;
+    if (data.weight !== undefined) {
+      weightSnapshotKg = toCanonicalKg(data.weight, preferredUnit);
+    }
     let bodyWeightSnapshot: number | null = null;
 
     if (movement.type === "BODYWEIGHT") {
@@ -359,12 +363,14 @@ export const updateSetServerFn = createServerFn({ method: "POST" })
       bodyWeightSnapshot = latestBodyWeight?.weightKg ?? null;
     }
 
+    const nextWeightSnapshotKg =
+      data.weight === undefined ? existingSet.weightSnapshotKg : toCanonicalKg(data.weight, preferredUnit);
+
     const updated = await prisma.set.update({
       where: { id: existingSet.id },
       data: {
         reps: data.reps ?? existingSet.reps,
-        weightSnapshotKg:
-          data.weight !== undefined ? toCanonicalKg(data.weight, preferredUnit) : existingSet.weightSnapshotKg,
+        weightSnapshotKg: nextWeightSnapshotKg,
         bodyWeightSnapshot,
         rpe: data.rpe === undefined ? existingSet.rpe : data.rpe,
         notes: data.notes === undefined ? existingSet.notes : data.notes,
@@ -412,6 +418,7 @@ export const setUserPreferencesServerFn = createServerFn({ method: "POST" })
     const nextValues = {
       weightUnit: toDbWeightUnit(data.weightUnit),
       defaultRestTargetSeconds: data.defaultRestTargetSeconds,
+      timeZone: data.timeZone,
     };
 
     let preference;
@@ -536,20 +543,44 @@ export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
     return { success: true as const };
   });
 
+function getDayKey(input: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(input);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (!year || !month || !day) {
+    return "1970-01-01";
+  }
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeDay(input: Date): string {
-  const copy = new Date(input);
-  copy.setHours(0, 0, 0, 0);
-  return copy.toISOString();
+  return getDayKey(input, "UTC");
+}
+
+function normalizeDayForTimeZone(input: Date, timeZone: string): string {
+  try {
+    return getDayKey(input, timeZone);
+  } catch {
+    return normalizeDay(input);
+  }
 }
 
 export function buildProgressionSeries(
   rows: Array<{ loggedAt: Date; reps: number; weightSnapshotKg: number }>,
   metric: ProgressionMetric,
+  timeZone = "UTC",
 ) {
   const grouped = new Map<string, Array<{ reps: number; weightSnapshotKg: number }>>();
 
   for (const row of rows) {
-    const key = normalizeDay(row.loggedAt);
+    const key = normalizeDayForTimeZone(row.loggedAt, timeZone);
     const bucket = grouped.get(key) ?? [];
     bucket.push({ reps: row.reps, weightSnapshotKg: row.weightSnapshotKg });
     grouped.set(key, bucket);
@@ -576,6 +607,7 @@ export const getProgressionSeriesServerFn = createServerFn()
   .inputValidator(progressionSeriesInputSchema)
   .handler(async ({ context, data }) => {
     const prisma = await getServerSidePrismaClient();
+    const preference = await getOrCreateUserPreference(prisma, context.user.id);
     const startDate = parseOptionalDate(data.startDate);
     const endDate = parseOptionalDate(data.endDate);
 
@@ -593,7 +625,7 @@ export const getProgressionSeriesServerFn = createServerFn()
       orderBy: { loggedAt: "asc" },
     });
 
-    return buildProgressionSeries(rows, data.metric);
+    return buildProgressionSeries(rows, data.metric, preference.timeZone);
   });
 
 export const getBodyWeightSeriesServerFn = createServerFn()

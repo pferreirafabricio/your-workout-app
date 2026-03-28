@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/features/workouts/workouts.server", () => ({
   getBodyWeightSeriesServerFn: vi.fn(async () => []),
   getCurrentWorkoutServerFn: vi.fn(async () => ({ id: "w1", sets: [] })),
-  getUserPreferencesServerFn: vi.fn(async () => ({ weightUnit: "kg", defaultRestTargetSeconds: 120 })),
+  getUserPreferencesServerFn: vi.fn(async () => ({ weightUnit: "kg", defaultRestTargetSeconds: 120, timeZone: "UTC" })),
 }));
 
 vi.mock("@/lib/features/movements/movements.server", () => ({
@@ -46,7 +46,11 @@ describe("current workout query options", () => {
     expect(pref.queryKey).toEqual(["user-preferences"]);
     expect(weight.queryKey).toEqual(["body-weight-series"]);
 
-    await expect(pref.queryFn?.({ queryKey: pref.queryKey } as never)).resolves.toEqual({ weightUnit: "kg", defaultRestTargetSeconds: 120 });
+    await expect(pref.queryFn?.({ queryKey: pref.queryKey } as never)).resolves.toEqual({
+      weightUnit: "kg",
+      defaultRestTargetSeconds: 120,
+      timeZone: "UTC",
+    });
     await expect(weight.queryFn?.({ queryKey: weight.queryKey } as never)).resolves.toEqual([]);
   });
 });

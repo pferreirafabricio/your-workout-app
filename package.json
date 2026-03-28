@@ -6,6 +6,7 @@
     "dev": "./scripts/dev.sh up",
     "dev:down": "./scripts/dev.sh down",
     "db:migrate": "DATABASE_URL=postgresql://postgres:postgres@localhost:5433/demo_project prisma migrate dev",
+    "db:reset": "DATABASE_URL=postgresql://postgres:postgres@localhost:5433/demo_project prisma migrate reset --force",
     "build": "vite build",
     "serve": "vite preview",
     "format": "prettier --write .",

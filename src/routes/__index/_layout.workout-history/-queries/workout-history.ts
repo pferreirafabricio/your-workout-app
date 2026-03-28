@@ -1,5 +1,9 @@
-import { getWorkoutHistoryServerFn } from "@/lib/features/workouts/workouts.server";
-import { getBodyWeightSeriesServerFn, getProgressionSeriesServerFn } from "@/lib/features/workouts/workouts.server";
+import {
+  getBodyWeightSeriesServerFn,
+  getProgressionSeriesServerFn,
+  getUserPreferencesServerFn,
+  getWorkoutHistoryServerFn,
+} from "@/lib/features/workouts/workouts.server";
 import { queryOptions } from "@tanstack/react-query";
 
 export const workoutHistoryQueryOptions = () =>
@@ -19,4 +23,10 @@ export const bodyWeightHistoryQueryOptions = () =>
   queryOptions({
     queryKey: ["body-weight-history"],
     queryFn: () => getBodyWeightSeriesServerFn({ data: {} }),
+  });
+
+export const userPreferencesQueryOptions = () =>
+  queryOptions({
+    queryKey: ["user-preferences"],
+    queryFn: () => getUserPreferencesServerFn(),
   });
