@@ -8,35 +8,145 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  name      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  password  String
-  workouts  Workout[]
+  id                    String             @id @default(uuid())
+  email                 String             @unique
+  name                  String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  passwordHash          String
+  failedSignInAttempts  Int                @default(0)
+  failedSignInWindowAt  DateTime?
+  lockedOutUntil        DateTime?
+  workouts              Workout[]
+  movements             Movement[]
+  bodyWeightEntries     BodyWeightEntry[]
+  preference            UserPreference?
+  authLockoutEvents     AuthLockoutEvent[]
 }
 
 model Movement {
-  id   String @id @default(uuid())
-  name String
-  sets Set[]
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  type        MovementType @default(WEIGHTED)
+  defaultUnit WeightUnit   @default(KG)
+  muscleGroup MuscleGroup?
+  equipmentId String?
+  equipment   Equipment?   @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  archivedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  sets        Set[]
+
+  @@index([userId, archivedAt])
+  @@index([equipmentId, archivedAt])
+  @@unique([userId, name])
 }
 
 model Workout {
   userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  id          String    @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  name        String?
+  startedAt   DateTime @default(now())
   completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   sets        Set[]
+
+  @@index([userId, completedAt, startedAt])
 }
 
 model Set {
-  id         String   @id @default(uuid())
-  workoutId  String
-  workout    Workout  @relation(fields: [workoutId], references: [id])
-  movementId String
-  movement   Movement @relation(fields: [movementId], references: [id])
-  reps       Int
-  weight     Int
+  id                 String   @id @default(uuid())
+  workoutId          String
+  workout            Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  movementId         String
+  movement           Movement @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  reps               Int
+  weightSnapshotKg   Float
+  bodyWeightSnapshot Float?
+  rpe                Float?
+  notes              String?
+  loggedAt           DateTime @default(now())
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([workoutId, loggedAt])
+  @@index([movementId, loggedAt])
+}
+
+model UserPreference {
+  userId                   String     @id
+  user                     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightUnit               WeightUnit @default(KG)
+  defaultRestTargetSeconds Int?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+}
+
+model BodyWeightEntry {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg     Float
+  originalUnit WeightUnit
+  recordedAt   DateTime
+  createdAt    DateTime   @default(now())
+
+  @@index([userId, recordedAt])
+}
+
+model Equipment {
+  id           String     @id @default(uuid())
+  code         String     @unique
+  name         String     @unique
+  isActive     Boolean    @default(true)
+  displayOrder Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  movements    Movement[]
+
+  @@index([isActive, displayOrder])
+}
+
+model AuthLockoutEvent {
+  id               String   @id @default(uuid())
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  emailFingerprint String
+  clientSource     String
+  failedAttempts   Int
+  windowStartedAt  DateTime
+  lockedUntil      DateTime?
+  updatedAt        DateTime @updatedAt
+
+  @@unique([emailFingerprint, clientSource])
+  @@index([lockedUntil])
+}
+
+enum MovementType {
+  WEIGHTED
+  BODYWEIGHT
+}
+
+enum WeightUnit {
+  KG
+  LBS
+}
+
+enum MuscleGroup {
+  CHEST
+  BACK
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  QUADS
+  HAMSTRINGS
+  GLUTES
+  CALVES
+  CORE
+  FULL_BODY
 }
