@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useForm } from "@tanstack/react-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AddButton, CancelButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
@@ -56,9 +57,40 @@ function NutritionFoodsPage() {
   const foodsQuery = useSuspenseQuery(nutritionFoodsQueryOptions());
   const foods = foodsQuery.data.foods as SavedFood[];
 
-  const [form, setForm] = useState<FoodForm>(EMPTY_FOOD);
   const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const form = useForm({
+    defaultValues: EMPTY_FOOD,
+    onSubmit: ({ value }) => {
+      const payload = {
+        name: value.name.trim(),
+        defaultQuantity: Number(value.defaultQuantity),
+        quantityUnit: value.quantityUnit,
+        calories: Number(value.calories),
+        proteinG: Number(value.proteinG),
+        carbsG: Number(value.carbsG),
+        fatsG: Number(value.fatsG),
+      };
+
+      if (!payload.name) {
+        setError("Name is required.");
+        return;
+      }
+
+      if ([payload.defaultQuantity, payload.calories, payload.proteinG, payload.carbsG, payload.fatsG].some(Number.isNaN)) {
+        setError("Enter valid numeric values.");
+        return;
+      }
+
+      if (editingFoodId) {
+        updateMutation.mutate({ foodId: editingFoodId, ...payload });
+        return;
+      }
+
+      createMutation.mutate(payload);
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: (payload: {
@@ -79,7 +111,7 @@ function NutritionFoodsPage() {
       }
 
       setError("");
-      setForm(EMPTY_FOOD);
+      form.reset();
       await queryClient.invalidateQueries({ queryKey: ["nutrition-foods"] });
       toast.success("Saved food created.");
     },
@@ -105,7 +137,7 @@ function NutritionFoodsPage() {
       }
 
       setError("");
-      setForm(EMPTY_FOOD);
+      form.reset();
       setEditingFoodId(null);
       await queryClient.invalidateQueries({ queryKey: ["nutrition-foods"] });
       toast.success("Saved food updated.");
@@ -125,63 +157,22 @@ function NutritionFoodsPage() {
       setError("");
       if (editingFoodId) {
         setEditingFoodId(null);
-        setForm(EMPTY_FOOD);
+        form.reset();
       }
       await queryClient.invalidateQueries({ queryKey: ["nutrition-foods"] });
       toast.success("Saved food deleted.");
     },
   });
 
-  const onSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const payload = {
-      name: form.name.trim(),
-      defaultQuantity: Number(form.defaultQuantity),
-      quantityUnit: form.quantityUnit,
-      calories: Number(form.calories),
-      proteinG: Number(form.proteinG),
-      carbsG: Number(form.carbsG),
-      fatsG: Number(form.fatsG),
-    };
-
-    if (!payload.name) {
-      setError("Name is required.");
-      return;
-    }
-
-    if (
-      [
-        payload.defaultQuantity,
-        payload.calories,
-        payload.proteinG,
-        payload.carbsG,
-        payload.fatsG,
-      ].some(Number.isNaN)
-    ) {
-      setError("Enter valid numeric values.");
-      return;
-    }
-
-    if (editingFoodId) {
-      updateMutation.mutate({ foodId: editingFoodId, ...payload });
-      return;
-    }
-
-    createMutation.mutate(payload);
-  };
-
   const onEdit = (food: SavedFood) => {
     setEditingFoodId(food.id);
-    setForm({
-      name: food.name,
-      defaultQuantity: String(food.defaultQuantity),
-      quantityUnit: food.quantityUnit,
-      calories: String(food.calories),
-      proteinG: String(food.proteinG),
-      carbsG: String(food.carbsG),
-      fatsG: String(food.fatsG),
-    });
+    form.setFieldValue("name", food.name);
+    form.setFieldValue("defaultQuantity", String(food.defaultQuantity));
+    form.setFieldValue("quantityUnit", food.quantityUnit);
+    form.setFieldValue("calories", String(food.calories));
+    form.setFieldValue("proteinG", String(food.proteinG));
+    form.setFieldValue("carbsG", String(food.carbsG));
+    form.setFieldValue("fatsG", String(food.fatsG));
   };
 
   return (
@@ -194,81 +185,121 @@ function NutritionFoodsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          <form className="grid grid-cols-1 md:grid-cols-4 gap-3" onSubmit={onSubmit}>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-name">
-                Food Name
-              </label>
-              <Input id="food-name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-default-quantity">
-                Default Quantity
-              </label>
-              <Input
-                id="food-default-quantity"
-                type="number"
-                value={form.defaultQuantity}
-                onChange={(e) => setForm((p) => ({ ...p, defaultQuantity: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-unit">
-                Quantity Unit
-              </label>
-              <select
-                id="food-unit"
-                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                value={form.quantityUnit}
-                onChange={(e) => setForm((p) => ({ ...p, quantityUnit: e.target.value as "GRAMS" | "SERVING" }))}>
-                <option value="GRAMS">grams</option>
-                <option value="SERVING">serving</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-calories">
-                Calories
-              </label>
-              <Input
-                id="food-calories"
-                type="number"
-                value={form.calories}
-                onChange={(e) => setForm((p) => ({ ...p, calories: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-protein">
-                Protein (g)
-              </label>
-              <Input
-                id="food-protein"
-                type="number"
-                value={form.proteinG}
-                onChange={(e) => setForm((p) => ({ ...p, proteinG: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-carbs">
-                Carbs (g)
-              </label>
-              <Input
-                id="food-carbs"
-                type="number"
-                value={form.carbsG}
-                onChange={(e) => setForm((p) => ({ ...p, carbsG: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-fats">
-                Fats (g)
-              </label>
-              <Input
-                id="food-fats"
-                type="number"
-                value={form.fatsG}
-                onChange={(e) => setForm((p) => ({ ...p, fatsG: e.target.value }))}
-              />
-            </div>
+          <form
+            className="grid grid-cols-1 md:grid-cols-4 gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              form.handleSubmit();
+            }}>
+            <form.Field name="name">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Food Name
+                  </label>
+                  <Input id={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="defaultQuantity">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Default Quantity
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="quantityUnit">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Quantity Unit
+                  </label>
+                  <select
+                    id={field.name}
+                    className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value as "GRAMS" | "SERVING") }>
+                    <option value="GRAMS">grams</option>
+                    <option value="SERVING">serving</option>
+                  </select>
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="calories">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Calories
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="proteinG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Protein (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="carbsG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Carbs (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field name="fatsG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Fats (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
             <div className="flex items-end gap-2">
               {editingFoodId ? (
                 <>
@@ -280,7 +311,7 @@ function NutritionFoodsPage() {
                     variant="outline"
                     onClick={() => {
                       setEditingFoodId(null);
-                      setForm(EMPTY_FOOD);
+                      form.reset();
                     }}
                   />
                 </>

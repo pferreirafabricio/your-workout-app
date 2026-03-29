@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useForm } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
 import { AddButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,7 +49,6 @@ function CurrentWorkoutPage() {
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
   const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions());
   const { data: bodyWeightSeries } = useSuspenseQuery(bodyWeightSeriesQueryOptions());
-  const [selectedMovement, setSelectedMovement] = useState("");
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
   const [rpe, setRpe] = useState("");
@@ -62,24 +62,65 @@ function CurrentWorkoutPage() {
   } | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  const addSetForm = useForm({
+    defaultValues: {
+      selectedMovement: "",
+      reps: "",
+      weight: "",
+      rpe: "",
+      notes: "",
+    },
+    onSubmit: ({ value }) => {
+      const parsedReps = Number(value.reps);
+      const parsedWeight = value.weight.trim() === "" ? undefined : Number(value.weight);
+      const parsedRpe = value.rpe.trim() === "" ? undefined : Number(value.rpe);
+
+      if (isSelectedMovementBodyweight && !bodyWeightSeries.length && parsedWeight === undefined) {
+        const message = "Record bodyweight first before adding a bodyweight set.";
+        setSetFormError(message);
+        toast.error(message);
+        return;
+      }
+
+      const parsed = addSetInputSchema.safeParse({
+        movementId: value.selectedMovement,
+        reps: parsedReps,
+        weight: parsedWeight,
+        rpe: parsedRpe,
+        notes: value.notes.trim() || undefined,
+      });
+
+      if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message ?? "Invalid set values.";
+        setSetFormError(message);
+        toast.error(message);
+        return;
+      }
+
+      addSetMutation.mutate(parsed.data);
+    },
+  });
+
   const applyMovementSelection = (movementId: string) => {
-    setSelectedMovement(movementId);
+    addSetForm.setFieldValue("selectedMovement", movementId);
     setSetFormError("");
 
     const movement = movements.find((item: { id: string; type: string }) => item.id === movementId);
     if (movement?.type === "BODYWEIGHT") {
       if (latestBodyWeight) {
-        setWeight(String(latestBodyWeight.weight));
+        addSetForm.setFieldValue("weight", String(latestBodyWeight.weight));
       } else {
-        setWeight("");
+        addSetForm.setFieldValue("weight", "");
       }
       return;
     }
 
-    setWeight("");
+    addSetForm.setFieldValue("weight", "");
   };
 
-  const selectedMovementRecord = movements.find((movement: { id: string; type: string }) => movement.id === selectedMovement);
+  const selectedMovementRecord = movements.find(
+    (movement: { id: string; type: string }) => movement.id === addSetForm.state.values.selectedMovement,
+  );
   const isSelectedMovementBodyweight = selectedMovementRecord?.type === "BODYWEIGHT";
   const latestBodyWeight = bodyWeightSeries.at(-1) ?? null;
 
@@ -145,10 +186,10 @@ function CurrentWorkoutPage() {
       });
 
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
-      setReps("");
-      setWeight("");
-      setRpe("");
-      setNotes("");
+      addSetForm.setFieldValue("reps", "");
+      addSetForm.setFieldValue("weight", "");
+      addSetForm.setFieldValue("rpe", "");
+      addSetForm.setFieldValue("notes", "");
       setSetFormError("");
 
       if (nextQueueMovement) {
@@ -253,12 +294,12 @@ function CurrentWorkoutPage() {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
+    const intervalId = globalThis.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
 
     return () => {
-      window.clearInterval(intervalId);
+      globalThis.clearInterval(intervalId);
     };
   }, [workout?.lastSetLoggedAt]);
 
@@ -267,42 +308,10 @@ function CurrentWorkoutPage() {
       return;
     }
 
-    if (!selectedMovement && workout.activeMovementId) {
-      setSelectedMovement(workout.activeMovementId);
+    if (!addSetForm.state.values.selectedMovement && workout.activeMovementId) {
+      applyMovementSelection(workout.activeMovementId);
     }
-  }, [selectedMovement, workout]);
-
-  const handleAddSet = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const parsedReps = Number(reps);
-    const parsedWeight = weight.trim() === "" ? undefined : Number(weight);
-    const parsedRpe = rpe.trim() === "" ? undefined : Number(rpe);
-
-    if (isSelectedMovementBodyweight && !bodyWeightSeries.length && parsedWeight === undefined) {
-      const message = "Record bodyweight first before adding a bodyweight set.";
-      setSetFormError(message);
-      toast.error(message);
-      return;
-    }
-
-    const parsed = addSetInputSchema.safeParse({
-      movementId: selectedMovement,
-      reps: parsedReps,
-      weight: parsedWeight,
-      rpe: parsedRpe,
-      notes: notes.trim() || undefined,
-    });
-
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? "Invalid set values.";
-      setSetFormError(message);
-      toast.error(message);
-      return;
-    }
-
-    addSetMutation.mutate(parsed.data);
-  };
+  }, [addSetForm.state.values.selectedMovement, workout]);
 
   const handleInlineSave = (setId: string, version: number) => {
     const parsedReps = Number(reps);
@@ -634,53 +643,83 @@ function CurrentWorkoutPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleAddSet} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
-            <Select value={selectedMovement} onChange={(e) => handleMovementChange(e.target.value)}>
-              <option value="">Select movement</option>
-              {movementOptions.map((m: { id: string; name: string }) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </Select>
-            <Input
-              type="number"
-              placeholder={weightPlaceholder}
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="w-full"
-              min={0}
-              disabled={isSelectedMovementBodyweight}
-            />
-            <Input
-              type="number"
-              placeholder="Reps"
-              value={reps}
-              onChange={(e) => setReps(e.target.value)}
-              className="w-full"
-              min={1}
-            />
-            <Input
-              type="number"
-              placeholder="RPE (optional)"
-              value={rpe}
-              onChange={(e) => setRpe(e.target.value)}
-              className="w-full"
-              min={1}
-              max={10}
-              step={0.5}
-            />
-            <Input
-              placeholder="Notes (optional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full"
-              maxLength={500}
-            />
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              addSetForm.handleSubmit();
+            }}
+            className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+            <addSetForm.Field name="selectedMovement">
+              {(field) => (
+                <Select value={field.state.value} onChange={(e) => handleMovementChange(e.target.value)}>
+                  <option value="">Select movement</option>
+                  {movementOptions.map((m: { id: string; name: string }) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </addSetForm.Field>
+            <addSetForm.Field name="weight">
+              {(field) => (
+                <Input
+                  type="number"
+                  placeholder={weightPlaceholder}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="w-full"
+                  min={0}
+                  disabled={isSelectedMovementBodyweight}
+                />
+              )}
+            </addSetForm.Field>
+            <addSetForm.Field name="reps">
+              {(field) => (
+                <Input
+                  type="number"
+                  placeholder="Reps"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="w-full"
+                  min={1}
+                />
+              )}
+            </addSetForm.Field>
+            <addSetForm.Field name="rpe">
+              {(field) => (
+                <Input
+                  type="number"
+                  placeholder="RPE (optional)"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="w-full"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                />
+              )}
+            </addSetForm.Field>
+            <addSetForm.Field name="notes">
+              {(field) => (
+                <Input
+                  placeholder="Notes (optional)"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="w-full"
+                  maxLength={500}
+                />
+              )}
+            </addSetForm.Field>
             <AddButton
               type="submit"
               size="sm"
-              disabled={!selectedMovement || !reps}
+              disabled={!addSetForm.state.values.selectedMovement || !addSetForm.state.values.reps}
               isLoading={addSetMutation.isPending}
             />
           </form>

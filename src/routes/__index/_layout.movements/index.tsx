@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useForm } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
 import { AddButton, CancelButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
@@ -41,13 +42,39 @@ function MovementsPage() {
   const queryClient = useQueryClient();
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
   const { data: equipment } = useSuspenseQuery(equipmentQueryOptions());
-  const [name, setName] = useState("");
-  const [type, setType] = useState<"WEIGHTED" | "BODYWEIGHT">("WEIGHTED");
-  const [muscleGroup, setMuscleGroup] = useState<MuscleGroupValue | "">("");
-  const [equipmentId, setEquipmentId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingArchiveTarget, setPendingArchiveTarget] = useState<{ id: string; currentlyArchived: boolean } | null>(null);
   const [error, setError] = useState("");
+
+  const movementForm = useForm({
+    defaultValues: {
+      name: "",
+      type: "WEIGHTED" as "WEIGHTED" | "BODYWEIGHT",
+      muscleGroup: "" as MuscleGroupValue | "",
+      equipmentId: "",
+    },
+    onSubmit: ({ value }) => {
+      const parsed = createMovementInputSchema.safeParse({
+        name: value.name.trim(),
+        type: value.type,
+        muscleGroup: value.muscleGroup || null,
+        equipmentId: value.equipmentId || null,
+      });
+
+      if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message ?? "Invalid movement fields.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      createMovementMutation.mutate({
+        ...parsed.data,
+        muscleGroup: parsed.data.muscleGroup ?? null,
+        equipmentId: parsed.data.equipmentId ?? null,
+      });
+    },
+  });
 
   const createMovementMutation = useMutation({
     mutationFn: (payload: {
@@ -65,9 +92,7 @@ function MovementsPage() {
       }
 
       queryClient.invalidateQueries({ queryKey: movementsQueryOptions().queryKey });
-      setName("");
-      setMuscleGroup("");
-      setEquipmentId("");
+      movementForm.reset();
       setError("");
       toast.success("Movement created.");
     },
@@ -113,37 +138,14 @@ function MovementsPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const parsed = createMovementInputSchema.safeParse({
-      name: name.trim(),
-      type,
-      muscleGroup: muscleGroup || null,
-      equipmentId: equipmentId || null,
-    });
-
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? "Invalid movement fields.";
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    createMovementMutation.mutate({
-      ...parsed.data,
-      muscleGroup: parsed.data.muscleGroup ?? null,
-      equipmentId: parsed.data.equipmentId ?? null,
-    });
-  };
-
   const handleUpdate = (movementId: string) => {
+    const value = movementForm.state.values;
     const parsed = updateMovementInputSchema.safeParse({
       movementId,
-      name: name.trim(),
-      type,
-      muscleGroup: muscleGroup || null,
-      equipmentId: equipmentId || null,
+      name: value.name.trim(),
+      type: value.type,
+      muscleGroup: value.muscleGroup || null,
+      equipmentId: value.equipmentId || null,
     });
 
     if (!parsed.success) {
@@ -198,10 +200,10 @@ function MovementsPage() {
     equipmentId: string | null;
   }) => {
     setEditingId(movement.id);
-    setName(movement.name);
-    setType(movement.type);
-    setMuscleGroup((movement.muscleGroup as MuscleGroupValue | null) ?? "");
-    setEquipmentId(movement.equipmentId ?? "");
+    movementForm.setFieldValue("name", movement.name);
+    movementForm.setFieldValue("type", movement.type);
+    movementForm.setFieldValue("muscleGroup", (movement.muscleGroup as MuscleGroupValue | null) ?? "");
+    movementForm.setFieldValue("equipmentId", movement.equipmentId ?? "");
     setError("");
   };
 
@@ -234,58 +236,86 @@ function MovementsPage() {
           <CardTitle>{editingId ? "Edit Movement" : "Add New Movement"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <Input
-              placeholder="Movement name (e.g. Bench Press)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="md:col-span-2"
-            />
-            <Select value={type} onChange={(event) => setType(event.target.value as "WEIGHTED" | "BODYWEIGHT")}> 
-              <option value="WEIGHTED">Weighted</option>
-              <option value="BODYWEIGHT">Bodyweight</option>
-            </Select>
-            <Select value={muscleGroup} onChange={(event) => setMuscleGroup(event.target.value as MuscleGroupValue | "") }>
-              <option value="">No muscle group</option>
-              {muscleGroupOptions.map((group) => (
-                <option key={group} value={group}>
-                  {group.replace("_", " ")}
-                </option>
-              ))}
-            </Select>
-            <Select value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)}>
-              <option value="">No equipment</option>
-              {equipment.map((item: { id: string; name: string }) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </Select>
-            {!editingId ? (
-              <AddButton type="submit" disabled={!name.trim()} isLoading={createMovementMutation.isPending} />
-            ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              movementForm.handleSubmit();
+            }}
+            className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <movementForm.Field name="name">
+              {(field) => (
+                <Input
+                  placeholder="Movement name (e.g. Bench Press)"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="md:col-span-2"
+                />
+              )}
+            </movementForm.Field>
+            <movementForm.Field name="type">
+              {(field) => (
+                <Select value={field.state.value} onChange={(event) => field.handleChange(event.target.value as "WEIGHTED" | "BODYWEIGHT")}> 
+                  <option value="WEIGHTED">Weighted</option>
+                  <option value="BODYWEIGHT">Bodyweight</option>
+                </Select>
+              )}
+            </movementForm.Field>
+            <movementForm.Field name="muscleGroup">
+              {(field) => (
+                <Select value={field.state.value} onChange={(event) => field.handleChange(event.target.value as MuscleGroupValue | "") }>
+                  <option value="">No muscle group</option>
+                  {muscleGroupOptions.map((group) => (
+                    <option key={group} value={group}>
+                      {group.replace("_", " ")}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </movementForm.Field>
+            <movementForm.Field name="equipmentId">
+              {(field) => (
+                <Select value={field.state.value} onChange={(event) => field.handleChange(event.target.value)}>
+                  <option value="">No equipment</option>
+                  {equipment.map((item: { id: string; name: string }) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </movementForm.Field>
+            {editingId ? (
               <div className="flex items-center gap-2 md:col-span-5">
-                <SaveButton
-                  type="button"
-                  onClick={() => handleUpdate(editingId)}
-                  disabled={!name.trim()}
-                  isLoading={updateMovementMutation.isPending}
-                  loadingText="Saving...">
-                  Save Changes
-                </SaveButton>
+                <movementForm.Subscribe selector={(state) => state.values.name}>
+                  {(name) => (
+                    <SaveButton
+                      type="button"
+                      onClick={() => handleUpdate(editingId)}
+                      disabled={!name.trim()}
+                      isLoading={updateMovementMutation.isPending}
+                      loadingText="Saving...">
+                      Save Changes
+                    </SaveButton>
+                  )}
+                </movementForm.Subscribe>
                 <CancelButton
                   type="button"
                   variant="ghost"
                   onClick={() => {
                     setEditingId(null);
-                    setName("");
-                    setType("WEIGHTED");
-                    setMuscleGroup("");
-                    setEquipmentId("");
+                    movementForm.reset();
                   }}>
                   Cancel
                 </CancelButton>
               </div>
+            ) : (
+              <movementForm.Subscribe selector={(state) => state.values.name}>
+                {(name) => (
+                  <AddButton type="submit" disabled={!name.trim()} isLoading={createMovementMutation.isPending} />
+                )}
+              </movementForm.Subscribe>
             )}
           </form>
         </CardContent>

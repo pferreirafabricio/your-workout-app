@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useForm } from "@tanstack/react-form";
 import { Archive, ArchiveRestore, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -72,10 +73,41 @@ function EquipmentPage() {
     [data],
   );
 
-  const [form, setForm] = useState<EquipmentFormValues>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
   const [pendingToggleTarget, setPendingToggleTarget] = useState<EquipmentRow | null>(null);
+
+  const form = useForm({
+    defaultValues: EMPTY_FORM,
+    onSubmit: ({ value }) => {
+      if (editingId) {
+        const parsed = updateEquipmentInputSchema.safeParse({
+          equipmentId: editingId,
+          ...normalizeEquipmentForm(value),
+        });
+
+        if (!parsed.success) {
+          const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
+          setError(message);
+          toast.error(message);
+          return;
+        }
+
+        updateMutation.mutate(parsed.data);
+        return;
+      }
+
+      const parsed = createEquipmentInputSchema.safeParse(normalizeEquipmentForm(value));
+      if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      createMutation.mutate(parsed.data);
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: (payload: { code: string; name: string; displayOrder: number }) =>
@@ -89,7 +121,7 @@ function EquipmentPage() {
       }
 
       setError("");
-      setForm(EMPTY_FORM);
+      form.reset();
       queryClient.invalidateQueries({ queryKey: equipmentManagementQueryOptions().queryKey });
       toast.success("Equipment created.");
     },
@@ -108,7 +140,7 @@ function EquipmentPage() {
 
       setError("");
       setEditingId(null);
-      setForm(EMPTY_FORM);
+      form.reset();
       queryClient.invalidateQueries({ queryKey: equipmentManagementQueryOptions().queryKey });
       toast.success("Equipment updated.");
     },
@@ -132,50 +164,17 @@ function EquipmentPage() {
     },
   });
 
-  const onSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (editingId) {
-      const parsed = updateEquipmentInputSchema.safeParse({
-        equipmentId: editingId,
-        ...normalizeEquipmentForm(form),
-      });
-
-      if (!parsed.success) {
-        const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
-        setError(message);
-        toast.error(message);
-        return;
-      }
-
-      updateMutation.mutate(parsed.data);
-      return;
-    }
-
-    const parsed = createEquipmentInputSchema.safeParse(normalizeEquipmentForm(form));
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    createMutation.mutate(parsed.data);
-  };
-
   const beginEdit = (row: EquipmentRow) => {
     setEditingId(row.id);
-    setForm({
-      code: row.code,
-      name: row.name,
-      displayOrder: String(row.displayOrder),
-    });
+    form.setFieldValue("code", row.code);
+    form.setFieldValue("name", row.name);
+    form.setFieldValue("displayOrder", String(row.displayOrder));
     setError("");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    form.reset();
     setError("");
   };
 
@@ -216,44 +215,65 @@ function EquipmentPage() {
           <CardTitle>{editingId ? "Edit Equipment" : "Add Equipment"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end" onSubmit={onSubmit}>
-            <div>
-              <label htmlFor="equipment-code" className="text-sm font-medium text-slate-700">
-                Code
-              </label>
-              <Input
-                id="equipment-code"
-                placeholder="BARBELL"
-                value={form.code}
-                onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
-              />
-            </div>
+          <form
+            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              form.handleSubmit();
+            }}>
+            <form.Field name="code">
+              {(field) => (
+                <div>
+                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
+                    Code
+                  </label>
+                  <Input
+                    id={field.name}
+                    placeholder="BARBELL"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
 
-            <div>
-              <label htmlFor="equipment-name" className="text-sm font-medium text-slate-700">
-                Name
-              </label>
-              <Input
-                id="equipment-name"
-                placeholder="Barbell"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              />
-            </div>
+            <form.Field name="name">
+              {(field) => (
+                <div>
+                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
+                    Name
+                  </label>
+                  <Input
+                    id={field.name}
+                    placeholder="Barbell"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
 
-            <div>
-              <label htmlFor="equipment-display-order" className="text-sm font-medium text-slate-700">
-                Display Order
-              </label>
-              <Input
-                id="equipment-display-order"
-                type="number"
-                min={0}
-                max={9999}
-                value={form.displayOrder}
-                onChange={(event) => setForm((prev) => ({ ...prev, displayOrder: event.target.value }))}
-              />
-            </div>
+            <form.Field name="displayOrder">
+              {(field) => (
+                <div>
+                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
+                    Display Order
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    min={0}
+                    max={9999}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
 
             <div className="flex gap-2">
               {editingId ? (

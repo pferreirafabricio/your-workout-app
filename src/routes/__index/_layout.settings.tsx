@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useForm } from "@tanstack/react-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SaveButton, SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
@@ -46,17 +47,82 @@ function SettingsPage() {
   const { data: nutritionGoals } = useSuspenseQuery(nutritionGoalsQueryOptions());
   const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
-  const [unit, setUnit] = useState<"kg" | "lbs">(preferences.weightUnit);
-  const [restTarget, setRestTarget] = useState(String(preferences.defaultRestTargetSeconds ?? 120));
-  const [timeZone, setTimeZone] = useState(preferences.timeZone ?? browserTimeZone);
-  const isCustomTimeZone = COMMON_TIME_ZONES.includes(timeZone) === false;
-  const [bodyWeight, setBodyWeight] = useState("");
-  const [calorieTarget, setCalorieTarget] = useState(String(nutritionGoals.goals?.calorieTarget ?? ""));
-  const [proteinTarget, setProteinTarget] = useState(String(nutritionGoals.goals?.proteinTargetG ?? ""));
-  const [carbsTarget, setCarbsTarget] = useState(String(nutritionGoals.goals?.carbsTargetG ?? ""));
-  const [fatsTarget, setFatsTarget] = useState(String(nutritionGoals.goals?.fatsTargetG ?? ""));
-  const [goalType, setGoalType] = useState<NutritionGoalType>(nutritionGoals.goals?.goalType ?? "MAINTENANCE");
   const [error, setError] = useState("");
+
+  const preferencesForm = useForm({
+    defaultValues: {
+      weightUnit: preferences.weightUnit,
+      defaultRestTargetSeconds: String(preferences.defaultRestTargetSeconds ?? 120),
+      timeZone: preferences.timeZone ?? browserTimeZone,
+    },
+    onSubmit: ({ value }) => {
+      const parsed = setUserPreferencesInputSchema.safeParse({
+        weightUnit: value.weightUnit,
+        defaultRestTargetSeconds: value.defaultRestTargetSeconds.trim() === "" ? null : Number(value.defaultRestTargetSeconds),
+        timeZone: value.timeZone,
+      });
+
+      if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message ?? "Invalid preferences.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      preferencesMutation.mutate(parsed.data);
+    },
+  });
+
+  const bodyWeightForm = useForm({
+    defaultValues: {
+      bodyWeight: "",
+    },
+    onSubmit: ({ value }) => {
+      const parsed = recordBodyWeightInputSchema.safeParse({
+        weight: Number(value.bodyWeight),
+        unit: preferencesForm.state.values.weightUnit,
+      });
+
+      if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message ?? "Invalid body weight.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      bodyWeightMutation.mutate(parsed.data);
+    },
+  });
+
+  const nutritionGoalsForm = useForm({
+    defaultValues: {
+      calorieTarget: String(nutritionGoals.goals?.calorieTarget ?? ""),
+      proteinTargetG: String(nutritionGoals.goals?.proteinTargetG ?? ""),
+      carbsTargetG: String(nutritionGoals.goals?.carbsTargetG ?? ""),
+      fatsTargetG: String(nutritionGoals.goals?.fatsTargetG ?? ""),
+      goalType: (nutritionGoals.goals?.goalType ?? "MAINTENANCE") as NutritionGoalType,
+    },
+    onSubmit: ({ value }) => {
+      const payload = {
+        calorieTarget: Number(value.calorieTarget),
+        proteinTargetG: Number(value.proteinTargetG),
+        carbsTargetG: Number(value.carbsTargetG),
+        fatsTargetG: Number(value.fatsTargetG),
+        goalType: value.goalType,
+      };
+
+      if ([payload.calorieTarget, payload.proteinTargetG, payload.carbsTargetG, payload.fatsTargetG].some(Number.isNaN)) {
+        const message = "Enter valid nutrition goal values.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+
+      nutritionGoalsMutation.mutate(payload);
+    },
+  });
+
+  const isCustomTimeZone = COMMON_TIME_ZONES.includes(preferencesForm.state.values.timeZone) === false;
 
   const preferencesMutation = useMutation({
     mutationFn: (payload: { weightUnit: "kg" | "lbs"; defaultRestTargetSeconds: number | null; timeZone: string }) =>
@@ -90,7 +156,7 @@ function SettingsPage() {
         return;
       }
       setError("");
-      setBodyWeight("");
+      bodyWeightForm.reset();
       queryClient.invalidateQueries({ queryKey: bodyWeightSeriesQueryOptions().queryKey });
       toast.success("Bodyweight recorded.");
     },
@@ -119,65 +185,7 @@ function SettingsPage() {
     },
   });
 
-  const savePreferences = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const parsed = setUserPreferencesInputSchema.safeParse({
-      weightUnit: unit,
-      defaultRestTargetSeconds: restTarget.trim() === "" ? null : Number(restTarget),
-      timeZone,
-    });
-
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? "Invalid preferences.";
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    preferencesMutation.mutate(parsed.data);
-  };
-
-  const submitBodyWeight = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const parsed = recordBodyWeightInputSchema.safeParse({
-      weight: Number(bodyWeight),
-      unit,
-    });
-
-    if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? "Invalid body weight.";
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    bodyWeightMutation.mutate(parsed.data);
-  };
-
-  const submitNutritionGoals = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const payload = {
-      calorieTarget: Number(calorieTarget),
-      proteinTargetG: Number(proteinTarget),
-      carbsTargetG: Number(carbsTarget),
-      fatsTargetG: Number(fatsTarget),
-      goalType,
-    };
-
-    if ([payload.calorieTarget, payload.proteinTargetG, payload.carbsTargetG, payload.fatsTargetG].some(Number.isNaN)) {
-      const message = "Enter valid nutrition goal values.";
-      setError(message);
-      toast.error(message);
-      return;
-    }
-
-    nutritionGoalsMutation.mutate(payload);
-  };
-
-  const latestBodyWeight = bodyWeightSeries[bodyWeightSeries.length - 1];
+  const latestBodyWeight = bodyWeightSeries.at(-1);
 
   return (
     <div className="space-y-6">
@@ -194,44 +202,63 @@ function SettingsPage() {
           <CardTitle>Preferences</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={savePreferences} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="preference-weight-unit">
-                Weight unit
-              </label>
-              <Select id="preference-weight-unit" value={unit} onChange={(event) => setUnit(event.target.value as "kg" | "lbs")}> 
-                <option value="kg">kg</option>
-                <option value="lbs">lbs</option>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="preference-rest-target">
-                Default rest target (seconds)
-              </label>
-              <Input
-                id="preference-rest-target"
-                type="number"
-                min={15}
-                max={600}
-                value={restTarget}
-                onChange={(event) => setRestTarget(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="preference-time-zone">
-                Timezone
-              </label>
-              <Select id="preference-time-zone" value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>
-                {COMMON_TIME_ZONES.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
-                  </option>
-                ))}
-                {isCustomTimeZone ? (
-                  <option value={timeZone}>{timeZone}</option>
-                ) : null}
-              </Select>
-            </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              preferencesForm.handleSubmit();
+            }}
+            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <preferencesForm.Field name="weightUnit">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Weight unit
+                  </label>
+                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value as "kg" | "lbs")}> 
+                    <option value="kg">kg</option>
+                    <option value="lbs">lbs</option>
+                  </Select>
+                </div>
+              )}
+            </preferencesForm.Field>
+            <preferencesForm.Field name="defaultRestTargetSeconds">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Default rest target (seconds)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    min={15}
+                    max={600}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </preferencesForm.Field>
+            <preferencesForm.Field name="timeZone">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Timezone
+                  </label>
+                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value)}>
+                    {COMMON_TIME_ZONES.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {zone}
+                      </option>
+                    ))}
+                    {isCustomTimeZone ? (
+                      <option value={preferencesForm.state.values.timeZone}>{preferencesForm.state.values.timeZone}</option>
+                    ) : null}
+                  </Select>
+                </div>
+              )}
+            </preferencesForm.Field>
             <SaveButton type="submit" disabled={preferencesMutation.isPending} isLoading={preferencesMutation.isPending}>
               Save Preferences
             </SaveButton>
@@ -245,31 +272,46 @@ function SettingsPage() {
           <CardTitle>Record Bodyweight</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={submitBodyWeight} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="text-sm font-medium text-slate-700">Bodyweight ({unit})</label>
-              <Input
-                type="number"
-                min={1}
-                max={1000}
-                value={bodyWeight}
-                onChange={(event) => setBodyWeight(event.target.value)}
-              />
-            </div>
-            <SubmitButton
-              type="submit"
-              icon="save"
-              disabled={bodyWeightMutation.isPending || !bodyWeight.trim()}
-              isLoading={bodyWeightMutation.isPending}
-              loadingText="Saving...">
-              Record
-            </SubmitButton>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              bodyWeightForm.handleSubmit();
+            }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <bodyWeightForm.Field name="bodyWeight">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Bodyweight ({preferencesForm.state.values.weightUnit})</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </bodyWeightForm.Field>
+            <bodyWeightForm.Subscribe selector={(state) => state.values.bodyWeight}>
+              {(bodyWeight) => (
+                <SubmitButton
+                  type="submit"
+                  icon="save"
+                  disabled={bodyWeightMutation.isPending || !bodyWeight.trim()}
+                  isLoading={bodyWeightMutation.isPending}
+                  loadingText="Saving...">
+                  Record
+                </SubmitButton>
+              )}
+            </bodyWeightForm.Subscribe>
           </form>
 
           {latestBodyWeight ? (
             <p className="text-sm text-slate-600 mt-4">
               Latest entry: {formatWeight(latestBodyWeight.weight, latestBodyWeight.weightUnit)} at {" "}
-              {formatDateTime(latestBodyWeight.date, { timeZone })}
+              {formatDateTime(latestBodyWeight.date, { timeZone: preferencesForm.state.values.timeZone })}
             </p>
           ) : (
             <p className="text-sm text-slate-500 mt-4">No bodyweight entries yet.</p>
@@ -282,61 +324,91 @@ function SettingsPage() {
           <CardTitle>Nutrition Goals</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={submitNutritionGoals} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-calories-goal">
-                Calorie Target (kcal)
-              </label>
-              <Input
-                id="nutrition-calories-goal"
-                type="number"
-                value={calorieTarget}
-                onChange={(event) => setCalorieTarget(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-protein-goal">
-                Protein Target (g)
-              </label>
-              <Input
-                id="nutrition-protein-goal"
-                type="number"
-                value={proteinTarget}
-                onChange={(event) => setProteinTarget(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-carbs-goal">
-                Carbs Target (g)
-              </label>
-              <Input
-                id="nutrition-carbs-goal"
-                type="number"
-                value={carbsTarget}
-                onChange={(event) => setCarbsTarget(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-fats-goal">
-                Fats Target (g)
-              </label>
-              <Input
-                id="nutrition-fats-goal"
-                type="number"
-                value={fatsTarget}
-                onChange={(event) => setFatsTarget(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="nutrition-goal-type">
-                Goal Type
-              </label>
-              <Select id="nutrition-goal-type" value={goalType} onChange={(event) => setGoalType(event.target.value as NutritionGoalType)}> 
-                <option value="CUT">Cut</option>
-                <option value="MAINTENANCE">Maintenance</option>
-                <option value="BULK">Bulk</option>
-              </Select>
-            </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              nutritionGoalsForm.handleSubmit();
+            }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <nutritionGoalsForm.Field name="calorieTarget">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Calorie Target (kcal)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </nutritionGoalsForm.Field>
+            <nutritionGoalsForm.Field name="proteinTargetG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Protein Target (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </nutritionGoalsForm.Field>
+            <nutritionGoalsForm.Field name="carbsTargetG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Carbs Target (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </nutritionGoalsForm.Field>
+            <nutritionGoalsForm.Field name="fatsTargetG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Fats Target (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                </div>
+              )}
+            </nutritionGoalsForm.Field>
+            <nutritionGoalsForm.Field name="goalType">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Goal Type
+                  </label>
+                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value as NutritionGoalType)}> 
+                    <option value="CUT">Cut</option>
+                    <option value="MAINTENANCE">Maintenance</option>
+                    <option value="BULK">Bulk</option>
+                  </Select>
+                </div>
+              )}
+            </nutritionGoalsForm.Field>
             <SaveButton type="submit" disabled={nutritionGoalsMutation.isPending} isLoading={nutritionGoalsMutation.isPending}>
               Save Nutrition Goals
             </SaveButton>

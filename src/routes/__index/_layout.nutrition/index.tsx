@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useForm } from "@tanstack/react-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -87,8 +88,35 @@ function NutritionPage() {
   const historyQuery = useSuspenseQuery(nutritionHistoryQueryOptions(historyStart, historyEnd, includeBodyWeight));
   const historyPoints = historyQuery.data.points as HistoryPoint[];
 
-  const [foodForm, setFoodForm] = useState(EMPTY_FOOD);
   const [error, setError] = useState("");
+
+  const foodForm = useForm({
+    defaultValues: EMPTY_FOOD,
+    onSubmit: ({ value }) => {
+      const parsed = {
+        localDate: selectedDate,
+        name: value.name.trim(),
+        quantity: Number(value.quantity),
+        quantityUnit: value.quantityUnit,
+        proteinG: Number(value.proteinG),
+        carbsG: Number(value.carbsG),
+        fatsG: Number(value.fatsG),
+        caloriesEntered: Number(value.caloriesEntered),
+      };
+
+      if (!parsed.name) {
+        setError("Name is required.");
+        return;
+      }
+
+      if ([parsed.quantity, parsed.proteinG, parsed.carbsG, parsed.fatsG, parsed.caloriesEntered].some(Number.isNaN)) {
+        setError("Enter valid numeric values.");
+        return;
+      }
+
+      createEntryMutation.mutate(parsed);
+    },
+  });
 
   const invalidateDaily = async () => {
     await queryClient.invalidateQueries({ queryKey: ["nutrition-daily-log", selectedDate] });
@@ -116,39 +144,12 @@ function NutritionPage() {
 
       response.notices?.forEach((notice) => toast.message(notice.message));
       setSelectedFoodId("");
-      setFoodForm(EMPTY_FOOD);
+      foodForm.reset();
       setError("");
       await invalidateDaily();
       toast.success("Food entry added.");
     },
   });
-
-  const onSubmitFood = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const parsed = {
-      localDate: selectedDate,
-      name: foodForm.name.trim(),
-      quantity: Number(foodForm.quantity),
-      quantityUnit: foodForm.quantityUnit,
-      proteinG: Number(foodForm.proteinG),
-      carbsG: Number(foodForm.carbsG),
-      fatsG: Number(foodForm.fatsG),
-      caloriesEntered: Number(foodForm.caloriesEntered),
-    };
-
-    if (!parsed.name) {
-      setError("Name is required.");
-      return;
-    }
-
-    if ([parsed.quantity, parsed.proteinG, parsed.carbsG, parsed.fatsG, parsed.caloriesEntered].some(Number.isNaN)) {
-      setError("Enter valid numeric values.");
-      return;
-    }
-
-    createEntryMutation.mutate(parsed);
-  };
 
   const applyFoodDefaults = (foodId: string) => {
     setSelectedFoodId(foodId);
@@ -157,15 +158,13 @@ function NutritionPage() {
       return;
     }
 
-    setFoodForm({
-      name: selectedFood.name,
-      quantity: String(selectedFood.defaultQuantity),
-      quantityUnit: selectedFood.quantityUnit,
-      caloriesEntered: String(selectedFood.calories),
-      proteinG: String(selectedFood.proteinG),
-      carbsG: String(selectedFood.carbsG),
-      fatsG: String(selectedFood.fatsG),
-    });
+    foodForm.setFieldValue("name", selectedFood.name);
+    foodForm.setFieldValue("quantity", String(selectedFood.defaultQuantity));
+    foodForm.setFieldValue("quantityUnit", selectedFood.quantityUnit);
+    foodForm.setFieldValue("caloriesEntered", String(selectedFood.calories));
+    foodForm.setFieldValue("proteinG", String(selectedFood.proteinG));
+    foodForm.setFieldValue("carbsG", String(selectedFood.carbsG));
+    foodForm.setFieldValue("fatsG", String(selectedFood.fatsG));
   };
 
   return (
@@ -186,7 +185,13 @@ function NutritionPage() {
 
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
-          <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={onSubmitFood}>
+          <form
+            className="grid grid-cols-1 md:grid-cols-4 gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              foodForm.handleSubmit();
+            }}>
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-slate-700" htmlFor="saved-food">
                 Saved Food Defaults
@@ -204,80 +209,114 @@ function NutritionPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-name">
-                Food Name
-              </label>
-              <Input id="food-name" value={foodForm.name} onChange={(e) => setFoodForm((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-quantity">
-                Quantity
-              </label>
-              <Input
-                id="food-quantity"
-                type="number"
-                value={foodForm.quantity}
-                onChange={(e) => setFoodForm((p) => ({ ...p, quantity: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-unit">
-                Quantity Unit
-              </label>
-              <select
-                id="food-unit"
-                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                value={foodForm.quantityUnit}
-                onChange={(e) => setFoodForm((p) => ({ ...p, quantityUnit: e.target.value as "GRAMS" | "SERVING" }))}>
-                <option value="GRAMS">grams</option>
-                <option value="SERVING">serving</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-calories">
-                Calories
-              </label>
-              <Input
-                id="food-calories"
-                type="number"
-                value={foodForm.caloriesEntered}
-                onChange={(e) => setFoodForm((p) => ({ ...p, caloriesEntered: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-protein">
-                Protein (g)
-              </label>
-              <Input
-                id="food-protein"
-                type="number"
-                value={foodForm.proteinG}
-                onChange={(e) => setFoodForm((p) => ({ ...p, proteinG: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-carbs">
-                Carbs (g)
-              </label>
-              <Input
-                id="food-carbs"
-                type="number"
-                value={foodForm.carbsG}
-                onChange={(e) => setFoodForm((p) => ({ ...p, carbsG: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700" htmlFor="food-fats">
-                Fats (g)
-              </label>
-              <Input
-                id="food-fats"
-                type="number"
-                value={foodForm.fatsG}
-                onChange={(e) => setFoodForm((p) => ({ ...p, fatsG: e.target.value }))}
-              />
-            </div>
+            <foodForm.Field name="name">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Food Name
+                  </label>
+                  <Input id={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(e) => field.handleChange(e.target.value)} />
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="quantity">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Quantity
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="quantityUnit">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Quantity Unit
+                  </label>
+                  <select
+                    id={field.name}
+                    className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value as "GRAMS" | "SERVING") }>
+                    <option value="GRAMS">grams</option>
+                    <option value="SERVING">serving</option>
+                  </select>
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="caloriesEntered">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Calories
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="proteinG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Protein (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="carbsG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Carbs (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </foodForm.Field>
+            <foodForm.Field name="fatsG">
+              {(field) => (
+                <div>
+                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
+                    Fats (g)
+                  </label>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </foodForm.Field>
             <div className="flex items-end">
               <AddButton type="submit" isLoading={createEntryMutation.isPending} loadingText="Adding..." className="w-full">
                 Add Entry
