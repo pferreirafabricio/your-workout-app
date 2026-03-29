@@ -67,7 +67,6 @@ function CurrentWorkoutPage() {
     durationSeconds: number;
     totalVolumeKg: number;
   } | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const addSetForm = useForm({
     defaultValues: {
@@ -298,20 +297,6 @@ function CurrentWorkoutPage() {
   });
 
   useEffect(() => {
-    if (!workout?.lastSetLoggedAt) {
-      return;
-    }
-
-    const intervalId = globalThis.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => {
-      globalThis.clearInterval(intervalId);
-    };
-  }, [workout?.lastSetLoggedAt]);
-
-  useEffect(() => {
     if (!workout) {
       return;
     }
@@ -346,16 +331,6 @@ function CurrentWorkoutPage() {
   };
 
   const canCompleteWorkout = Boolean(workout && workout.sets.length > 0);
-  const restTargetSeconds = workout?.restTargetSeconds ?? 0;
-  const restElapsedSeconds =
-    workout?.lastSetLoggedAt
-      ? Math.max(0, Math.floor((nowMs - new Date(workout.lastSetLoggedAt).getTime()) / 1000))
-      : 0;
-  const restTargetReached = Boolean(workout?.lastSetLoggedAt && restElapsedSeconds >= restTargetSeconds);
-  const restRemainingSeconds = Math.max(0, restTargetSeconds - restElapsedSeconds);
-  const restProgress = workout?.lastSetLoggedAt
-    ? Math.min(1, restElapsedSeconds / Math.max(1, restTargetSeconds))
-    : 0;
 
   const activeUnit = preferences.weightUnit;
   let weightPlaceholder = `Weight (${activeUnit})`;
@@ -479,12 +454,8 @@ function CurrentWorkoutPage() {
       )}
 
       <RestTimerCard
-        hasLastSet={Boolean(workout.lastSetLoggedAt)}
-        restTargetReached={restTargetReached}
-        restRemainingSeconds={restRemainingSeconds}
-        restElapsedSeconds={restElapsedSeconds}
+        lastSetLoggedAt={workout.lastSetLoggedAt}
         restTargetSeconds={workout.restTargetSeconds}
-        restProgress={restProgress}
       />
 
       <QueueModeCard

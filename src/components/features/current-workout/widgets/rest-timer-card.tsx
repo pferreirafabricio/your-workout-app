@@ -1,22 +1,39 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 type RestTimerCardProps = {
-  hasLastSet: boolean;
-  restTargetReached: boolean;
-  restRemainingSeconds: number;
-  restElapsedSeconds: number;
+  lastSetLoggedAt: string | Date | null;
   restTargetSeconds: number;
-  restProgress: number;
 };
 
 export function RestTimerCard({
-  hasLastSet,
-  restTargetReached,
-  restRemainingSeconds,
-  restElapsedSeconds,
+  lastSetLoggedAt,
   restTargetSeconds,
-  restProgress,
 }: Readonly<RestTimerCardProps>) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const parsedLastSetMs = lastSetLoggedAt ? new Date(lastSetLoggedAt).getTime() : null;
+  const hasLastSet = parsedLastSetMs != null && Number.isFinite(parsedLastSetMs);
+
+  useEffect(() => {
+    if (!hasLastSet) {
+      return;
+    }
+
+    setNowMs(Date.now());
+    const intervalId = globalThis.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      globalThis.clearInterval(intervalId);
+    };
+  }, [hasLastSet, parsedLastSetMs]);
+
+  const restElapsedSeconds = hasLastSet && parsedLastSetMs != null ? Math.max(0, Math.floor((nowMs - parsedLastSetMs) / 1000)) : 0;
+  const restTargetReached = hasLastSet && restElapsedSeconds >= restTargetSeconds;
+  const restRemainingSeconds = Math.max(0, restTargetSeconds - restElapsedSeconds);
+  const restProgress = hasLastSet ? Math.min(1, restElapsedSeconds / Math.max(1, restTargetSeconds)) : 0;
+
   const restStatusText = hasLastSet
     ? restTargetReached
       ? "Target reached"
