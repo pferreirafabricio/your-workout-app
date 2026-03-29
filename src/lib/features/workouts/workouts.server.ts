@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient } from "@/lib/core/db.server";
 import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
 import { Prisma } from "../../../../prisma/generated/client/client";
-import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/types";
+import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/shared/consts";
 import { fromCanonicalKg, toCanonicalKg } from "@/lib/shared/utils";
 import {
   activateWorkoutQueueMovementInputSchema,

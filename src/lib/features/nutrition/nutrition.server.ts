@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient } from "@/lib/core/db.server";
 import {
   calculateCanonicalCalories,
   calculateMacroPercentages,

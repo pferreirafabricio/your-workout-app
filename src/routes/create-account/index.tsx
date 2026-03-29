@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { createAccountServerFn } from "@/lib/features/auth/auth.server";
 import { z } from "zod";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { strongPasswordSchema } from "@/lib/features/workouts/workout-progression";
 import { LogIn } from "lucide-react";
 

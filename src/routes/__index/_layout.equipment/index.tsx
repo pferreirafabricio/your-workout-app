@@ -19,7 +19,7 @@ import {
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
 } from "@/lib/features/workouts/workout-progression";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { equipmentManagementQueryOptions } from "./-queries/equipment";
 import { toast } from "sonner";
 

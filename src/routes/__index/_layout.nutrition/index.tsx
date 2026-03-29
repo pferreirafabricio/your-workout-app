@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AddButton } from "@/components/ui/action-buttons";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import {
   createNutritionFoodEntryServerFn,
 } from "@/lib/features/nutrition/nutrition.server";

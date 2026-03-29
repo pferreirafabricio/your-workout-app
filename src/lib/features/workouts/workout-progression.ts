@@ -6,7 +6,7 @@ import {
   MIN_RPE,
   PROGRESSION_METRICS,
   WEIGHT_UNITS,
-} from "@/lib/types";
+} from "@/lib/shared/consts";
 
 export const mutationErrorMessages = {
   validationError: "Please fix the highlighted fields and try again.",

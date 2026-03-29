@@ -1,4 +1,4 @@
-import { ClientConfig } from "./lib/get-server-config.server";
+import { ClientConfig } from "./lib/core/get-server-config.server";
 
 declare global {
   interface Window {

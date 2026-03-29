@@ -6,7 +6,7 @@ export interface ClientConfig {
 
 function resolveClientEnv(key: string): string {
   if (!key.startsWith("VITE_")) throw new Error(`Client environment variable must start with "VITE_": ${key}`);
-  if (typeof window !== "undefined") {
+  if (globalThis.window !== undefined) {
     const value = import.meta.env[key];
     if (value) return value;
   }
@@ -16,16 +16,17 @@ function resolveClientEnv(key: string): string {
 }
 
 let _clientConfig: ClientConfig | null = null;
+
 export function getClientConfig(): ClientConfig {
   if (_clientConfig) return _clientConfig;
-  if (typeof window === "undefined" || import.meta.env.VITE_ENVIRONMENT === "development") {
+  if (globalThis.window === undefined || import.meta.env.VITE_ENVIRONMENT === "development") {
     _clientConfig = {
       environment: resolveClientEnv("VITE_ENVIRONMENT") as "development" | "test" | "staging" | "production",
     };
   } else {
     _clientConfig = {
       environment:
-        window.APP_CONFIG?.environment ||
+        globalThis.window.APP_CONFIG?.environment ||
         (resolveClientEnv("VITE_ENVIRONMENT") as "development" | "test" | "staging" | "production"),
     };
   }

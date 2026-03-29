@@ -5,7 +5,7 @@ import { useForm } from "@tanstack/react-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AddButton, CancelButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import {
   createNutritionFoodServerFn,
   deleteNutritionFoodServerFn,

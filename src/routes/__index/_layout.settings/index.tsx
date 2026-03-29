@@ -12,7 +12,7 @@ import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/li
 import { nutritionGoalsQueryOptions } from "../_layout.nutrition/-queries/nutrition";
 import { upsertNutritionGoalsServerFn } from "@/lib/features/nutrition/nutrition.server";
 import { formatDateTime, formatWeight } from "@/lib/shared/utils";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
 
 const COMMON_TIME_ZONES = [

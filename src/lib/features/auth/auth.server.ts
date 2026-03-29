@@ -14,7 +14,7 @@ import {
   csrfTokenCookieName,
   refreshTokenCookieName,
 } from "@/lib/features/auth/auth.consts";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient } from "@/lib/core/db.server";
 import {
   signInInputSchema,
   strongPasswordSchema,
@@ -30,7 +30,7 @@ const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 12);
 
 const LOCKOUT_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-import { DEFAULT_REST_TARGET_SECONDS } from "@/lib/types";
+import { DEFAULT_REST_TARGET_SECONDS } from "@/lib/shared/consts";
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {

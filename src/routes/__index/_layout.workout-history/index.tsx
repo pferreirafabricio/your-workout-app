@@ -22,7 +22,7 @@ import {
 } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
 
 type MovementTuple = [string, string];

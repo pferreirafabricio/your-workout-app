@@ -1,7 +1,7 @@
 import { logoutServerFn } from "@/lib/features/auth/auth.server";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 
 export const Route = createFileRoute("/logout")({
   component: LogoutPage,

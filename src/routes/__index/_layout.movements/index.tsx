@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { archiveMovementInputSchema, createMovementInputSchema, updateMovementInputSchema } from "@/lib/features/workouts/workout-progression";
 import { Archive, ArchiveRestore, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
 
 type MuscleGroupValue =

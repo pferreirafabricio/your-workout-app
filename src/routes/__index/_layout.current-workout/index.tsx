@@ -28,7 +28,7 @@ import {
 import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
 import { formatDate, formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { getCsrfHeaders } from "@/lib/csrf.client";
+import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
