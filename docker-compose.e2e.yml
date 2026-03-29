@@ -1,0 +1,61 @@
+name: super-fit-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demo_project_e2e
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demo_project_e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/demo_project_e2e
+    command:
+      - sh
+      - -lc
+      - bunx prisma migrate deploy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/demo_project_e2e
+      PORT: 3000
+    ports:
+      - ${PLAYWRIGHT_APP_PORT:-0}:3000
+    command:
+      - sh
+      - -lc
+      - bun run vite dev --host 0.0.0.0 --port 3000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000 >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
