@@ -8,16 +8,28 @@ async function addFoodEntry(page: Page, name: string, quantity: string, calories
   await page.getByLabel("Carbs (g)").fill(carbs);
   await page.getByLabel("Fats (g)").fill(fats);
   await page.getByRole("button", { name: "Add Entry" }).click();
-  await expect(page.getByRole("heading", { name: "History Table" })).toBeVisible();
+  await expect(page.getByLabel("Food Name")).toHaveValue("");
+}
+
+function dateFromOffset(daysFromNow: number) {
+  const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 test.describe("Nutrition", () => {
   test("loads nutrition daily log page and logs a food entry", async ({ page }) => {
+    const targetDate = dateFromOffset(1);
+
     await page.goto("/nutrition");
     await expect(page.getByRole("heading", { name: "Nutrition Daily Log" })).toBeVisible();
+    await page.getByLabel("Log Date").fill(targetDate);
 
     await addFoodEntry(page, "Chicken breast", "150", "250", "35", "0", "5");
     await expect(page.getByRole("heading", { name: "History Table" })).toBeVisible();
+    await page.getByLabel("End Date").fill(targetDate);
+    await page.getByLabel("Start Date").fill(targetDate);
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await expect(page.getByRole("cell", { name: targetDate })).toBeVisible();
   });
 
   test("supports goals and history rendering", async ({ page }) => {
@@ -34,6 +46,9 @@ test.describe("Nutrition", () => {
   });
 
   test("updates daily balance state from deficit to surplus", async ({ page }) => {
+    const targetDate = dateFromOffset(3);
+    const suffix = Date.now();
+
     await page.goto("/settings");
     await page.getByLabel("Calorie Target (kcal)").fill("2000");
     await page.getByLabel("Protein Target (g)").fill("180");
@@ -42,25 +57,37 @@ test.describe("Nutrition", () => {
     await page.getByRole("button", { name: "Save Nutrition Goals" }).click();
 
     await page.goto("/nutrition/calories-macros");
-    await expect(page.getByText(/(DEFICIT|SURPLUS)/i)).toBeVisible();
+    await page.locator("#summary-date").fill(targetDate);
+    await expect(page.getByText(/DEFICIT/i)).toBeVisible();
     await expect(page.getByText("Consumed Calories")).toBeVisible();
 
     await page.goto("/nutrition");
-    await addFoodEntry(page, "Oats bowl", "1", "300", "20", "40", "10");
-    await addFoodEntry(page, "Large meal", "1", "2200", "100", "220", "100");
+    await page.getByLabel("Log Date").fill(targetDate);
+    await addFoodEntry(page, `Oats bowl ${suffix}`, "1", "300", "20", "40", "10");
+    await addFoodEntry(page, `Large meal ${suffix}`, "1", "2200", "100", "220", "100");
 
     await page.goto("/nutrition/calories-macros");
+    await page.locator("#summary-date").fill(targetDate);
     await expect(page.getByText(/SURPLUS/i)).toBeVisible();
     await expect(page.getByText("Remaining")).toBeVisible();
   });
 
   test("shows and hides history bodyweight overlay", async ({ page }) => {
+    const targetDate = dateFromOffset(2);
+
     await page.goto("/nutrition");
+    await page.getByLabel("Log Date").fill(targetDate);
     await addFoodEntry(page, "Yogurt", "1", "120", "12", "10", "4");
+    await page.getByLabel("End Date").fill(targetDate);
+    await page.getByLabel("Start Date").fill(targetDate);
+    await page.getByRole("button", { name: "Refresh" }).click();
 
     await expect(page.getByRole("cell", { name: "-" }).first()).toBeVisible();
 
-    await page.getByLabel("Include body weight").uncheck();
+    const includeBodyWeight = page.getByRole("checkbox", { name: /Include body weight/i });
+    await expect(includeBodyWeight).toBeChecked();
+    await includeBodyWeight.uncheck();
+    await expect(includeBodyWeight).not.toBeChecked();
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByText("hidden").first()).toBeVisible();
   });

@@ -117,3 +117,17 @@ export function parseOptionalDate(dateInput?: string): Date | undefined {
   }
   return parsed;
 }
+
+export function parseOptionalEndDateInclusive(dateInput?: string): Date | undefined {
+  const parsed = parseOptionalDate(dateInput);
+  if (!parsed) {
+    return undefined;
+  }
+
+  if (!dateInput || !/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    return parsed;
+  }
+
+  parsed.setUTCHours(23, 59, 59, 999);
+  return parsed;
+}

@@ -1,7 +1,34 @@
 import { useMemo } from "react";
 
+type Environment = "development" | "test" | "staging" | "production";
+
 export interface ClientConfig {
-  environment: "development" | "test" | "staging" | "production";
+  environment: Environment;
+}
+
+const VALID_ENVIRONMENTS = new Set(["development", "test", "staging", "production"] as const);
+
+function isTemplatePlaceholder(value: string): boolean {
+  return /^\$\{.+\}$/.test(value);
+}
+
+function resolveEnvironment(): ClientConfig["environment"] {
+  const windowEnvironment = globalThis.window?.APP_CONFIG?.environment;
+  if (windowEnvironment && VALID_ENVIRONMENTS.has(windowEnvironment as ClientConfig["environment"])) {
+    return windowEnvironment as ClientConfig["environment"];
+  }
+
+  const viteEnvironment = import.meta.env.VITE_ENVIRONMENT as Environment;
+  if (viteEnvironment && !isTemplatePlaceholder(viteEnvironment) && VALID_ENVIRONMENTS.has(viteEnvironment)) {
+    return viteEnvironment;
+  }
+
+  const processEnvironment = process.env.VITE_ENVIRONMENT;
+  if (processEnvironment && !isTemplatePlaceholder(processEnvironment) && VALID_ENVIRONMENTS.has(processEnvironment as ClientConfig["environment"])) {
+    return processEnvironment as ClientConfig["environment"];
+  }
+
+  return "development";
 }
 
 function resolveClientEnv(key: string): string {
@@ -19,15 +46,14 @@ let _clientConfig: ClientConfig | null = null;
 
 export function getClientConfig(): ClientConfig {
   if (_clientConfig) return _clientConfig;
-  if (globalThis.window === undefined || import.meta.env.VITE_ENVIRONMENT === "development") {
+  const environment = resolveEnvironment();
+  if (globalThis.window === undefined || environment === "development") {
     _clientConfig = {
-      environment: resolveClientEnv("VITE_ENVIRONMENT") as "development" | "test" | "staging" | "production",
+      environment,
     };
   } else {
     _clientConfig = {
-      environment:
-        globalThis.window.APP_CONFIG?.environment ||
-        (resolveClientEnv("VITE_ENVIRONMENT") as "development" | "test" | "staging" | "production"),
+      environment,
     };
   }
   console.log("Client configuration loaded:", _clientConfig);

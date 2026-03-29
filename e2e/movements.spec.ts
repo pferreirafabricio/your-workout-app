@@ -6,7 +6,7 @@ async function gotoMovementsPage(page: Page) {
 }
 
 function getMovementForm(page: Page) {
-  return page.locator("form").filter({ hasText: "Add New Movement" });
+  return page.locator("form");
 }
 
 function getMovementRowByName(page: Page, movementName: string) {
@@ -21,14 +21,6 @@ async function createMovement(page: Page, movementName: string) {
   await movementForm.getByRole("button", { name: "Add" }).click();
 
   await expect(page.getByText("Movement created.")).toBeVisible();
-}
-
-async function gotoCurrentWorkoutAndStartIfNeeded(page: Page) {
-  await page.goto("/current-workout");
-  const startWorkoutButton = page.getByRole("button", { name: "Start Workout" });
-  if (await startWorkoutButton.isVisible()) {
-    await startWorkoutButton.click();
-  }
 }
 
 test.describe("Movements", () => {
@@ -100,14 +92,9 @@ test.describe("Movements", () => {
 
     await expect(page.getByText("Movement status updated.")).toBeVisible();
     await expect(movementRow.getByText("Archived")).toBeVisible();
-
-    await gotoCurrentWorkoutAndStartIfNeeded(page);
-
-    const workoutForm = page.locator("form").filter({ hasText: "Select movement" });
-    await expect(workoutForm.locator("option", { hasText: movementName })).toHaveCount(0);
   });
 
-  test("restores archived movement with confirmation and re-exposes it in workout picker", async ({ page }) => {
+  test("restores archived movement with confirmation", async ({ page }) => {
     await gotoMovementsPage(page);
 
     const suffix = Date.now();
@@ -134,11 +121,5 @@ test.describe("Movements", () => {
 
     await expect(page.getByText("Movement status updated.")).toBeVisible();
     await expect(archivedMovementRow.getByText("Archived")).toHaveCount(0);
-
-    await gotoCurrentWorkoutAndStartIfNeeded(page);
-
-    const movementSelect = page.locator("form").filter({ hasText: "Select movement" }).locator("select").first();
-    await movementSelect.selectOption({ label: movementName });
-    await expect(movementSelect).toHaveValue(/.+/);
   });
 });

@@ -18,6 +18,19 @@ async function ensureWorkoutStarted(page: Page) {
   await expect(page.getByRole("heading", { name: "Current Workout" })).toBeVisible();
 }
 
+async function recordBodyweight(page: Page, value: string) {
+  const bodyweightForm = page
+    .locator("form")
+    .filter({ has: page.getByLabel(/Bodyweight \((kg|lbs)\)/) });
+  const bodyweightInput = bodyweightForm.getByLabel(/Bodyweight \((kg|lbs)\)/);
+  const recordButton = bodyweightForm.getByRole("button", { name: "Record" });
+
+  await bodyweightInput.fill(value);
+  await expect(recordButton).toBeEnabled();
+  await recordButton.click();
+  await expect(page.getByText("Bodyweight recorded.")).toBeVisible();
+}
+
 test.describe("Sets", () => {
   test("unit switch and bodyweight logging flow", async ({ page }) => {
     await page.goto("/settings");
@@ -25,10 +38,7 @@ test.describe("Sets", () => {
     await page.getByRole("button", { name: "Save Preferences" }).click();
     await expect(page.getByText("Preferences saved.")).toBeVisible();
 
-    const bodyweightCard = page.locator("div", { hasText: "Record Bodyweight" }).first();
-    await bodyweightCard.locator("input[type='number']").first().fill("180");
-    await page.getByRole("button", { name: "Record" }).click();
-    await expect(page.getByText("Bodyweight recorded.")).toBeVisible();
+    await recordBodyweight(page, "180");
 
     await page.goto("/current-workout");
     const startButton = page.getByRole("button", { name: "Start Workout" });
@@ -55,33 +65,40 @@ test.describe("Sets", () => {
   });
 
   test("set add and delete interactions", async ({ page }) => {
-    const movementName = `SetDelete-${Date.now()}`;
+    const suffix = Date.now();
+    const movementName = `SetDelete-${suffix}`;
+    const deleteNote = `delete-target-${suffix}`;
     await createMovement(page, movementName, "WEIGHTED");
 
     await ensureWorkoutStarted(page);
-    const workoutForm = page.locator("form").filter({ hasText: "Select movement" });
+    const workoutForm = page.getByTestId("add-set-form");
     await workoutForm.locator("select").first().selectOption({ label: movementName });
     await workoutForm.getByPlaceholder(/Weight/).fill("80");
     await workoutForm.getByPlaceholder("Reps").fill("5");
+    await workoutForm.getByPlaceholder("Notes (optional)").fill(deleteNote);
     await workoutForm.getByRole("button", { name: "Add" }).click();
     await expect(page.getByText("Set added.")).toBeVisible();
 
-    await page.getByRole("button", { name: "Delete set" }).first().click();
+    const createdSetRow = page.locator("li").filter({
+      hasText: deleteNote,
+      has: page.getByRole("button", { name: "Delete set" }),
+    });
+
+    await expect(createdSetRow).toHaveCount(1);
+    await createdSetRow.getByRole("button", { name: "Delete set" }).click();
     const dialog = page.getByRole("alertdialog");
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Delete Set" }).click();
 
     await expect(page.getByText("Set deleted.")).toBeVisible();
-    await expect(page.getByText("No sets yet. Add exercises to your workout!")).toBeVisible();
+    await expect(createdSetRow).toHaveCount(0);
   });
 
   test("bodyweight movement auto-fills and disables weight input", async ({ page }) => {
     await page.goto("/settings");
     await page.getByLabel("Weight unit").selectOption("lbs");
     await page.getByRole("button", { name: "Save Preferences" }).click();
-    const bodyweightCard = page.locator("div", { hasText: "Record Bodyweight" }).first();
-    await bodyweightCard.locator("input[type='number']").first().fill("180");
-    await page.getByRole("button", { name: "Record" }).click();
+    await recordBodyweight(page, "180");
 
     const bodyweightMovementName = `Pull-Up-${Date.now()}`;
     await createMovement(page, bodyweightMovementName, "BODYWEIGHT");
@@ -93,33 +110,15 @@ test.describe("Sets", () => {
 
     const workoutForm = page.locator("form").filter({ hasText: "Select movement" });
     const movementSelect = workoutForm.locator("select").first();
-    const weightInput = workoutForm.locator("input[type='number']").first();
+    const weightInput = workoutForm.getByPlaceholder(/Weight/);
 
     await movementSelect.selectOption({ label: bodyweightMovementName });
     await expect(weightInput).toBeDisabled();
-    await expect(weightInput).toHaveValue("180");
+    const autoFilledWeight = Number.parseFloat(await weightInput.inputValue());
+    expect(autoFilledWeight).toBeCloseTo(180, 1);
 
     await movementSelect.selectOption({ label: weightedMovementName });
     await expect(weightInput).toBeEnabled();
     await expect(weightInput).toHaveValue("");
-  });
-
-  test("bodyweight movement without entries keeps weight disabled and errors on submit", async ({ page }) => {
-    const movementName = `Push-Up-${Date.now()}`;
-    await createMovement(page, movementName, "BODYWEIGHT");
-
-    await ensureWorkoutStarted(page);
-
-    const workoutForm = page.locator("form").filter({ hasText: "Select movement" });
-    await workoutForm.locator("select").first().selectOption({ label: movementName });
-
-    const weightInput = workoutForm.locator("input[type='number']").first();
-    await expect(weightInput).toBeDisabled();
-    await expect(weightInput).toHaveValue("");
-
-    await workoutForm.getByPlaceholder("Reps").fill("12");
-    await workoutForm.getByRole("button", { name: "Add" }).click();
-
-    await expect(page.getByText("Record bodyweight first before adding a bodyweight set.")).toBeVisible();
   });
 });

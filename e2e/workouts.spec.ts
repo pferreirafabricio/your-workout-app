@@ -19,7 +19,7 @@ async function ensureWorkoutStarted(page: Page) {
 }
 
 async function addSetForMovement(page: Page, movementName: string, reps: string, weight: string, note?: string) {
-  const workoutForm = page.locator("form").filter({ hasText: "Select movement" });
+  const workoutForm = page.getByTestId("add-set-form");
   await workoutForm.locator("select").first().selectOption({ label: movementName });
   await workoutForm.getByPlaceholder(/Weight/).fill(weight);
   await workoutForm.getByPlaceholder("Reps").fill(reps);
@@ -32,8 +32,8 @@ async function addSetForMovement(page: Page, movementName: string, reps: string,
 
 async function completeWorkout(page: Page) {
   await page.getByRole("button", { name: /Complete Workout/ }).first().click();
-  await expect(page.getByText("Workout completed.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Latest Completion Summary" })).toBeVisible();
+  await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Workout" })).toBeVisible();
 }
 
 test.describe("Workouts", () => {
@@ -101,7 +101,7 @@ test.describe("Workouts", () => {
     await expect(page.getByRole("heading", { name: "Completed Workouts" })).toBeVisible();
 
     await page.getByRole("button", { name: "Show" }).first().click();
-    await expect(page.getByText(movementName)).toBeVisible();
+    await expect(page.getByRole("cell", { name: movementName, exact: true })).toBeVisible();
 
     await page.locator("tbody input[type='checkbox']").nth(1).check();
     await page.getByRole("button", { name: /Delete Selected \(1\)/ }).click();

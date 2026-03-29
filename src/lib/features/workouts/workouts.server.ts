@@ -16,6 +16,7 @@ import {
   deleteSetInputSchema,
   moveWorkoutQueueItemInputSchema,
   parseOptionalDate,
+  parseOptionalEndDateInclusive,
   progressionSeriesInputSchema,
   recordBodyWeightInputSchema,
   setWorkoutQueueItemSkippedInputSchema,
@@ -854,7 +855,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
     const preferredUnit = fromDbWeightUnit(preference.weightUnit);
 
     const startDate = parseOptionalDate(data?.startDate);
-    const endDate = parseOptionalDate(data?.endDate);
+    const endDate = parseOptionalEndDateInclusive(data?.endDate);
 
     const workouts = await prisma.workout.findMany({
       where: {
@@ -919,7 +920,7 @@ export const getProgressionSeriesServerFn = createServerFn()
     const prisma = await getServerSidePrismaClient();
     const preference = await getOrCreateUserPreference(prisma, context.user.id);
     const startDate = parseOptionalDate(data.startDate);
-    const endDate = parseOptionalDate(data.endDate);
+    const endDate = parseOptionalEndDateInclusive(data.endDate);
 
     const rows = await prisma.set.findMany({
       where: {
@@ -946,7 +947,7 @@ export const getBodyWeightSeriesServerFn = createServerFn()
     const preference = await getOrCreateUserPreference(prisma, context.user.id);
     const preferredUnit = fromDbWeightUnit(preference.weightUnit);
     const startDate = parseOptionalDate(data?.startDate);
-    const endDate = parseOptionalDate(data?.endDate);
+    const endDate = parseOptionalEndDateInclusive(data?.endDate);
 
     const entries = await prisma.bodyWeightEntry.findMany({
       where: {

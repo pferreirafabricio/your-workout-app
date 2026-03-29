@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addSetInputSchema,
+  parseOptionalDate,
+  parseOptionalEndDateInclusive,
   progressionSeriesInputSchema,
   setUserPreferencesInputSchema,
   updateSetInputSchema,
@@ -69,5 +71,13 @@ describe("workouts validation", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  it("parses date-only input at midnight for general parsing", () => {
+    expect(parseOptionalDate("2026-03-29")?.toISOString()).toBe("2026-03-29T00:00:00.000Z");
+  });
+
+  it("parses date-only end dates as end-of-day inclusive", () => {
+    expect(parseOptionalEndDateInclusive("2026-03-29")?.toISOString()).toBe("2026-03-29T23:59:59.999Z");
   });
 });

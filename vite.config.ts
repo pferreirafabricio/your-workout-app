@@ -18,9 +18,22 @@ const config = defineConfig({
     !isTest &&
       nitro({
         preset: "node-server",
+        externals: {
+          traceInclude: ["./node_modules/decimal.js-light/decimal.js"],
+        },
       }),
     viteReact(),
   ].filter(Boolean),
+  resolve: {
+    alias: {
+      // Prisma runtime imports an extensionless decimal.js-light subpath that Node ESM can't resolve.
+      "decimal.js-light/decimal": "decimal.js-light/decimal.js",
+    },
+  },
+  ssr: {
+    // Keep decimal.js-light bundled so runtime doesn't depend on Nitro's trimmed external package copy.
+    noExternal: ["decimal.js-light"],
+  },
   test: {
     globals: true,
     environment: "jsdom",
