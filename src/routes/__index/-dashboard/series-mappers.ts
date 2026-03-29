@@ -1,4 +1,3 @@
-import { formatDateKey } from "@/lib/shared/utils";
 import type { NutritionMetric } from "./metrics";
 
 export type ProgressionPoint = {
@@ -17,18 +16,12 @@ export type NutritionPoint = {
 
 export type ChartPoint = {
   date: string;
-  axisDate: string;
   value: number;
 };
-
-function axisDateFromKey(dateKey: string): string {
-  return formatDateKey(dateKey, { formatOptions: { month: "short", day: "numeric" } });
-}
 
 export function mapProgressionSeriesToChart(points: ProgressionPoint[]): ChartPoint[] {
   return points.map((point) => ({
     date: point.date,
-    axisDate: axisDateFromKey(point.date),
     value: point.value,
   }));
 }
@@ -49,7 +42,6 @@ export function mapNutritionSeriesToChart(points: NutritionPoint[], metric: Nutr
 
       return {
         date: point.localDate,
-        axisDate: axisDateFromKey(point.localDate),
         value: metricValue,
       };
     })

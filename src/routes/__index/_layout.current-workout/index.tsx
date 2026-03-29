@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
+import { useStore } from "@tanstack/react-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -106,6 +107,7 @@ function CurrentWorkoutPage() {
       addSetMutation.mutate(parsed.data);
     },
   });
+  const addSetValues = useStore(addSetForm.store, (state) => state.values);
 
   const applyMovementSelection = (movementId: string) => {
     addSetForm.setFieldValue("selectedMovement", movementId);
@@ -125,7 +127,7 @@ function CurrentWorkoutPage() {
   };
 
   const selectedMovementRecord = movements.find(
-    (movement: { id: string; type: string }) => movement.id === addSetForm.state.values.selectedMovement,
+    (movement: { id: string; type: string }) => movement.id === addSetValues.selectedMovement,
   );
   const isSelectedMovementBodyweight = selectedMovementRecord?.type === "BODYWEIGHT";
   const latestBodyWeight = bodyWeightSeries.at(-1) ?? null;
@@ -314,10 +316,10 @@ function CurrentWorkoutPage() {
       return;
     }
 
-    if (!addSetForm.state.values.selectedMovement && workout.activeMovementId) {
+    if (!addSetValues.selectedMovement && workout.activeMovementId) {
       applyMovementSelection(workout.activeMovementId);
     }
-  }, [addSetForm.state.values.selectedMovement, workout]);
+  }, [addSetValues.selectedMovement, workout]);
 
   const handleInlineSave = (setId: string, version: number) => {
     const parsedReps = Number(reps);
@@ -529,16 +531,16 @@ function CurrentWorkoutPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <AddSetForm
-            selectedMovement={addSetForm.state.values.selectedMovement}
+            selectedMovement={addSetValues.selectedMovement}
             movementOptions={movementOptions}
-            weight={addSetForm.state.values.weight}
-            reps={addSetForm.state.values.reps}
-            rpe={addSetForm.state.values.rpe}
-            notes={addSetForm.state.values.notes}
+            weight={addSetValues.weight}
+            reps={addSetValues.reps}
+            rpe={addSetValues.rpe}
+            notes={addSetValues.notes}
             weightPlaceholder={weightPlaceholder}
             isSelectedMovementBodyweight={isSelectedMovementBodyweight}
             isPending={addSetMutation.isPending}
-            canSubmit={Boolean(addSetForm.state.values.selectedMovement && addSetForm.state.values.reps)}
+            canSubmit={Boolean(addSetValues.selectedMovement && addSetValues.reps)}
             onMovementChange={handleMovementChange}
             onWeightChange={(value) => addSetForm.setFieldValue("weight", value)}
             onRepsChange={(value) => addSetForm.setFieldValue("reps", value)}

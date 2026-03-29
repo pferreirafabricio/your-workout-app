@@ -51,7 +51,8 @@ export function AddSetForm({
         event.stopPropagation();
         onSubmit();
       }}
-      className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+      className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center"
+      data-testid="add-set-form">
       <Select value={selectedMovement} onChange={(event) => onMovementChange(event.target.value)}>
         <option value="">Select movement</option>
         {movementOptions.map((movement) => (

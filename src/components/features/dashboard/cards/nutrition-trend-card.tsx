@@ -7,7 +7,6 @@ type NutritionMetric = "calories" | "protein" | "carbs" | "fats" | "bodyWeight";
 
 type ChartPoint = {
   date: string;
-  axisDate: string;
   value: number;
 };
 
@@ -71,7 +70,18 @@ export function NutritionTrendCard({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.5} />
-                <XAxis dataKey="axisDate" tick={{ fill: "#475569", fontSize: 12 }} tickLine={false} axisLine={false} minTickGap={24} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "#475569", fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={24}
+                  tickFormatter={(value) =>
+                    typeof value === "string"
+                      ? formatDateKey(value, { formatOptions: { month: "short", day: "numeric" } })
+                      : ""
+                  }
+                />
                 <YAxis tick={{ fill: "#475569", fontSize: 12 }} tickLine={false} axisLine={false} width={70} />
                 <Tooltip
                   cursor={{ stroke: "#047857", strokeOpacity: 0.25 }}
