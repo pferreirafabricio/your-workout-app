@@ -1,12 +1,14 @@
 # Super Fit App
 
+[![CI/CD](https://github.com/pferreirafabricio/your-workout-app/actions/workflows/cicd.yml/badge.svg)](https://github.com/pferreirafabricio/your-workout-app/actions/workflows/cicd.yml)
+
 A full-stack fitness tracking application built with TanStack Start, Bun, Prisma, and PostgreSQL.
 
 This README describes the current state of the app and the improvements delivered from the original implementation brief.
 
 - Original brief and previous requirements: [docs/original-project-requirements.md](docs/original-project-requirements.md)
 
-## App Screenshots
+## 📸 App Screenshots
 
 ### Home Dashboard
 
@@ -20,7 +22,7 @@ This README describes the current state of the app and the improvements delivere
 
 ![Calories and macros tracking](docs/screenshots/calories-macros.png)
 
-## Requirements Coverage
+## ✅ Requirements Coverage
 
 This section addresses the original feature requests and stretch goals listed in [docs/original-project-requirements.md](docs/original-project-requirements.md).
 
@@ -55,20 +57,20 @@ This section addresses the original feature requests and stretch goals listed in
 - UI cleanup and polish
   - Implemented. Action icons, improved confirmation flows for dangerous actions, modernized styling decisions, and updated feedback patterns.
 
-## Improvements Implemented
+## 🚀 Improvements Implemented
 
-### Features
+### ✨ Features
 
 - Added nutrition tracking to the app
 - Added equipment CRUD workflows
 
-### Security
+### 🔒 Security
 
 - Uses token-based authentication in cookies
 - Added CSRF protection
 - Added stronger password validation requirements
 
-### UI
+### 🎨 UI
 
 - Added icons to button actions
 - Improved UX around delete/archive and file-like destructive flows
@@ -77,26 +79,26 @@ This section addresses the original feature requests and stretch goals listed in
 - Updated fonts and colors to a more modern visual direction
 - Updated the toast/feedback experience
 
-### DevX
+### 🛠️ DevX
 
 - Docker development supports source watch and live update workflows
 - Refactored forms to use TanStack Form patterns
 - Added separate Docker-based test workflow stages
 
-### Database Design and Performance
+### 🗄️ Database Design and Performance
 
 - Added missing indexes
 - Added missing unique constraints
 - Added and corrected compound indexes for common access patterns
 
-### Architectural Improvements
+### 🧱 Architectural Improvements
 
 - Added unit tests across core feature/domain areas
 - Improved separation of concerns (server, domain, validation, UI)
 - Adopted a folder-by-feature strategy
 - Improved component separation and reuse boundaries
 
-## Tech Stack
+## ⚙️ Tech Stack
 
 - Framework: TanStack Start (React SSR)
 - Router: TanStack Router
@@ -107,7 +109,7 @@ This section addresses the original feature requests and stretch goals listed in
 - Runtime/Package Manager: Bun
 - Testing: Vitest + Playwright
 
-## Local Development
+## 💻 Local Development
 
 ### Prerequisites
 
@@ -130,7 +132,7 @@ bun run dev
 - `bun run typecheck` - Run TypeScript checks
 - `bun run test` - Run tests
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```text
 src/
@@ -144,6 +146,6 @@ docs/
   screenshots/     # README screenshot assets
 ```
 
-## Notes
+## 📝 Notes
 
 - For historical context and the original task list, see [docs/original-project-requirements.md](docs/original-project-requirements.md).
