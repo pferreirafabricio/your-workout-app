@@ -114,7 +114,9 @@ export function CaloriesMacrosOverview({
           <CardContent>
             {goalContext.hasGoals ? (
               <>
-                <div className="text-2xl font-bold text-slate-900">{goalContext.remainingCalories} kcal</div>
+                <div data-testid="remaining-calories-value" className="text-2xl font-bold text-slate-900">
+                  {goalContext.remainingCalories} kcal
+                </div>
                 <p className="text-xs text-slate-500 mt-1">Against your daily target</p>
               </>
             ) : (

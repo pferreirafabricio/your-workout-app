@@ -197,7 +197,7 @@ export const getNutritionDailyLogServerFn = createServerFn()
 
     if (goals) {
       const balanceCalories = round2(dailyLog.totalCaloriesCanonical - goals.calorieTarget);
-      const remainingCalories = round2(goals.calorieTarget - dailyLog.totalCaloriesCanonical);
+      const remainingCalories = Math.max(0, round2(goals.calorieTarget - dailyLog.totalCaloriesCanonical));
       goalContext.calorieTarget = goals.calorieTarget;
       goalContext.proteinTargetG = goals.proteinTargetG;
       goalContext.carbsTargetG = goals.carbsTargetG;
