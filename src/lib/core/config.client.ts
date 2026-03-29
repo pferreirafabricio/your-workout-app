@@ -31,17 +31,6 @@ function resolveEnvironment(): ClientConfig["environment"] {
   return "development";
 }
 
-function resolveClientEnv(key: string): string {
-  if (!key.startsWith("VITE_")) throw new Error(`Client environment variable must start with "VITE_": ${key}`);
-  if (globalThis.window !== undefined) {
-    const value = import.meta.env[key];
-    if (value) return value;
-  }
-  const value = process.env[key];
-  if (value) return value;
-  throw new Error(`Missing environment variable: ${key}`);
-}
-
 let _clientConfig: ClientConfig | null = null;
 
 export function getClientConfig(): ClientConfig {

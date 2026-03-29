@@ -13,9 +13,10 @@
     "typecheck": "tsc --noEmit",
     "generate": "prisma generate",
     "test": "bun run test:e2e",
-    "test:unit": "vitest run src",
+    "test:unit": "bun run generate && vitest run src",
     "test:integration": "echo 'Integration tests are not implemented yet. Placeholder stage passed.'",
     "test:e2e": "./scripts/e2e.sh",
+    "test:e2e:ui": "./scripts/e2e.sh --ui",
     "test:e2e:local": "playwright test",
     "test:ui": "playwright test --ui"
   },
