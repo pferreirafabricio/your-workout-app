@@ -15,16 +15,19 @@ async function ensureWorkoutStarted(page: Page) {
   if (await startButton.isVisible()) {
     await startButton.click();
   }
-  await expect(page.getByRole("heading", { name: "Current Workout" })).toBeVisible();
+  await expect(page.getByTestId("add-set-form")).toBeVisible();
 }
 
 async function addSetForMovement(page: Page, movementName: string, reps: string, weight: string, note?: string) {
+  await ensureWorkoutStarted(page);
+
   const workoutForm = page.getByTestId("add-set-form");
-  const movementSelect = workoutForm.locator("select").first();
+  const movementSelect = workoutForm.getByRole("combobox").first();
   const weightInput = workoutForm.getByPlaceholder(/Weight/);
   const repsInput = workoutForm.getByPlaceholder("Reps");
   const addButton = workoutForm.getByRole("button", { name: "Add" });
 
+  await expect(movementSelect).toBeEnabled();
   await movementSelect.selectOption({ label: movementName });
   await expect(movementSelect.locator("option:checked")).toContainText(movementName);
 
@@ -66,11 +69,13 @@ test.describe("Workouts", () => {
     await setRow.getByRole("button", { name: "Edit" }).click();
     await setRow.locator("input[type='number']").nth(0).fill("6");
     await setRow.locator("input[type='number']").nth(1).fill("105");
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Set updated.")).toBeVisible();
-    await expect(page.getByText("6 reps x 105")).toBeVisible();
+    const saveButton = setRow.getByRole("button", { name: "Save" });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(setRow.locator("input[type='number']")).toHaveCount(0);
+    await expect(setRow).toContainText("6 reps x 105");
 
-    await page.getByRole("button", { name: "Delete set" }).first().click();
+    await setRow.getByRole("button", { name: "Delete set" }).click();
     const deleteDialog = page.getByRole("alertdialog");
     await expect(deleteDialog).toBeVisible();
     await deleteDialog.getByRole("button", { name: "Delete Set" }).click();
