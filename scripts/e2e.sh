@@ -4,10 +4,21 @@ set -euo pipefail
 
 COMPOSE_FILE="docker-compose.e2e.yml"
 PROJECT_NAME="super-fit-e2e-${USER:-user}-$(date +%s)-$$"
+LOCAL_ENV_FILE=".env.local"
+CREATED_TEMP_LOCAL_ENV="false"
+
+if [ ! -f "$LOCAL_ENV_FILE" ]; then
+  touch "$LOCAL_ENV_FILE"
+  CREATED_TEMP_LOCAL_ENV="true"
+fi
 
 cleanup() {
   echo "Tearing down ephemeral e2e containers..."
   COMPOSE_PROJECT_NAME="$PROJECT_NAME" docker compose -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
+
+  if [ "$CREATED_TEMP_LOCAL_ENV" = "true" ]; then
+    rm -f "$LOCAL_ENV_FILE"
+  fi
 }
 
 trap cleanup EXIT INT TERM
