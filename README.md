@@ -6,7 +6,8 @@ A full-stack fitness tracking application built with TanStack Start, Bun, Prisma
 
 This README describes the current state of the app and the improvements delivered from the original implementation brief.
 
-- Original brief and previous requirements: [docs/original-project-requirements.md](docs/original-project-requirements.md)
+> [!NOTE]
+> Original brief and previous requirements: [docs/original-project-requirements.md](docs/original-project-requirements.md)
 
 ## 📸 App Screenshots
 
