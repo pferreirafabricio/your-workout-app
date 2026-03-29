@@ -11,7 +11,7 @@ import { getCsrfHeaders } from "@/lib/csrf.client";
 import { formatRetryDelay } from "@/lib/shared/utils/time";
 import { UserPlus, Eye, EyeOff } from "lucide-react";
 
-export const Route = createFileRoute("/sign-in")({
+export const Route = createFileRoute("/sign-in/")({
   beforeLoad: ({ context }) => {
     if (context.user) {
       throw redirect({ to: "/" });

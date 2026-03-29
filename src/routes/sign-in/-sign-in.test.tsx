@@ -18,7 +18,7 @@ vi.mock("@/lib/features/auth/auth.server", () => ({
   signInServerFn: (input: unknown) => signInServerFnMock(input),
 }));
 
-import { Route, SignInPage } from "./sign-in";
+import { Route, SignInPage } from ".";
 
 describe("sign-in route integration", () => {
   beforeEach(() => {

@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { nutritionDailyLogQueryOptions, nutritionDefaultsQueryOptions } from "./_layout.nutrition/-queries/nutrition";
+import { nutritionDailyLogQueryOptions, nutritionDefaultsQueryOptions } from "../-queries/nutrition";
 
-export const Route = createFileRoute("/__index/_layout/nutrition/calories-macros")({
+export const Route = createFileRoute("/__index/_layout/nutrition/calories-macros/")({
   loader: async ({ context }) => {
     const defaults = await context.queryClient.ensureQueryData(nutritionDefaultsQueryOptions());
     await context.queryClient.ensureQueryData(nutritionDailyLogQueryOptions(defaults.today));

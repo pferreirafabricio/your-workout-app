@@ -16,7 +16,7 @@ const createAccountInputSchema = z.object({
   password: strongPasswordSchema,
 });
 
-export const Route = createFileRoute("/create-account")({
+export const Route = createFileRoute("/create-account/")({
   beforeLoad: ({ context }) => {
     if (context.user) {
       throw redirect({ to: "/" });

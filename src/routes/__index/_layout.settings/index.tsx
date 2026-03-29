@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SaveButton, SubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "./_layout.current-workout/-queries/current-workout";
+import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "../_layout.current-workout/-queries/current-workout";
 import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/features/workouts/workouts.server";
 import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workout-progression";
-import { nutritionGoalsQueryOptions } from "./_layout.nutrition/-queries/nutrition";
+import { nutritionGoalsQueryOptions } from "../_layout.nutrition/-queries/nutrition";
 import { upsertNutritionGoalsServerFn } from "@/lib/features/nutrition/nutrition.server";
 import { formatDateTime, formatWeight } from "@/lib/shared/utils";
 import { getCsrfHeaders } from "@/lib/csrf.client";
@@ -29,7 +29,7 @@ const COMMON_TIME_ZONES = [
 
 type NutritionGoalType = "CUT" | "MAINTENANCE" | "BULK";
 
-export const Route = createFileRoute("/__index/_layout/settings")({
+export const Route = createFileRoute("/__index/_layout/settings/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(userPreferencesQueryOptions()),

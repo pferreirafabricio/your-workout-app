@@ -11,7 +11,7 @@ import {
   deleteNutritionFoodServerFn,
   updateNutritionFoodServerFn,
 } from "@/lib/features/nutrition/nutrition.server";
-import { nutritionFoodsQueryOptions } from "./_layout.nutrition/-queries/nutrition";
+import { nutritionFoodsQueryOptions } from "../-queries/nutrition";
 import { toast } from "sonner";
 
 type FoodForm = {
@@ -45,7 +45,7 @@ const EMPTY_FOOD: FoodForm = {
   fatsG: "",
 };
 
-export const Route = createFileRoute("/__index/_layout/nutrition/foods")({
+export const Route = createFileRoute("/__index/_layout/nutrition/foods/")({
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(nutritionFoodsQueryOptions());
   },
