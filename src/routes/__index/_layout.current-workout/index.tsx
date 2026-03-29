@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@/components/ui/button";
-import { AddButton, DeleteButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import {
   activateWorkoutQueueMovementServerFn,
   createWorkoutServerFn,
@@ -17,7 +14,7 @@ import {
   updateSetServerFn,
   deleteSetServerFn,
 } from "@/lib/features/workouts/workouts.server";
-import { Play, Check, X, ArrowUp, ArrowDown, CircleDot, Minus, Plus, Loader2 } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   bodyWeightSeriesQueryOptions,
@@ -26,10 +23,19 @@ import {
   userPreferencesQueryOptions,
 } from "./-queries/current-workout";
 import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workouts.validation";
-import { formatDate, formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
+import { formatDate } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
+import {
+  AddSetForm,
+  EmptyWorkoutStateCard,
+  LatestCompletionSummaryCard,
+  QueueModeCard,
+  QueueCompleteBannerCard,
+  RestTimerCard,
+  WorkoutSetsList,
+} from "@/components/features/current-workout";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
@@ -410,21 +416,11 @@ function CurrentWorkoutPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-slate-500 mb-4">No active workout. Ready to start?</p>
-            <Button onClick={() => createWorkoutMutation.mutate()} size="lg">
-              <Play className="w-4 h-4 mr-2" />
-              {createWorkoutMutation.isPending ? "Starting..." : "Start Workout"}
-            </Button>
-            {completionSummary && (
-              <p className="text-sm text-emerald-700 mt-4">
-                Last workout: {formatDurationSeconds(completionSummary.durationSeconds)}, {" "}
-                {formatWeight(completionSummary.totalVolumeKg, "kg")} total volume.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <EmptyWorkoutStateCard
+          isStarting={createWorkoutMutation.isPending}
+          completionSummary={completionSummary}
+          onStartWorkout={() => createWorkoutMutation.mutate()}
+        />
       </div>
     );
   }
@@ -447,6 +443,12 @@ function CurrentWorkoutPage() {
       const completedSets = setCountsByMovementId.get(queueItem.movementId) ?? 0;
       return completedSets >= queueItem.targetSets;
     });
+  let completeWorkoutLabel = "Complete Workout";
+  if (completeWorkoutMutation.isPending) {
+    completeWorkoutLabel = "Completing...";
+  } else if (isQueueComplete) {
+    completeWorkoutLabel = "Complete Workout (Ready)";
+  }
 
   return (
     <div className="space-y-6">
@@ -457,26 +459,16 @@ function CurrentWorkoutPage() {
           onClick={() => completeWorkoutMutation.mutate()}
           disabled={completeWorkoutMutation.isPending || !canCompleteWorkout}>
           <Check className="w-4 h-4 mr-2" />
-          {completeWorkoutMutation.isPending ? "Completing..." : isQueueComplete ? "Complete Workout (Ready)" : "Complete Workout"}
+          {completeWorkoutLabel}
         </Button>
       </div>
 
-      {isQueueComplete && (
-        <Card>
-          <CardContent className="py-3 flex items-center justify-between gap-3">
-            <p className="text-sm text-emerald-700 font-medium">
-              You hit all queue targets. You can complete this workout now.
-            </p>
-            <Button
-              size="sm"
-              onClick={() => completeWorkoutMutation.mutate()}
-              disabled={completeWorkoutMutation.isPending}>
-              <Check className="h-4 w-4 mr-2" />
-              Finish Workout
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {isQueueComplete ? (
+        <QueueCompleteBannerCard
+          isCompleting={completeWorkoutMutation.isPending}
+          onFinishWorkout={() => completeWorkoutMutation.mutate()}
+        />
+      ) : null}
 
       {setFormError && (
         <Card>
@@ -484,149 +476,42 @@ function CurrentWorkoutPage() {
         </Card>
       )}
 
-      <Card>
-        <CardContent className="py-5 px-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <div
-              className="h-24 w-24 rounded-full grid place-items-center text-slate-900 text-sm font-semibold"
-              style={{
-                background: `conic-gradient(${restTargetReached ? "#059669" : "#0f766e"} ${Math.round(restProgress * 360)}deg, #e2e8f0 0deg)`,
-              }}>
-              <div className="h-[4.8rem] w-[4.8rem] rounded-full bg-white grid place-items-center leading-tight text-center">
-                <div>{workout.lastSetLoggedAt ? `${restRemainingSeconds}s` : "Ready"}</div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-slate-500">Rest timer</p>
-              <p className="text-base font-semibold text-slate-900">
-                {workout.lastSetLoggedAt ? `${restElapsedSeconds}s elapsed` : "Starts after your first set"}
-              </p>
-              <p className="text-sm text-slate-600">Target: {workout.restTargetSeconds}s</p>
-            </div>
-          </div>
-          <span className={restTargetReached ? "text-emerald-600 font-semibold" : "text-slate-500 font-medium"}>
-            {workout.lastSetLoggedAt ? (restTargetReached ? "Target reached" : "Keep resting") : "No active rest interval"}
-          </span>
-        </CardContent>
-      </Card>
+      <RestTimerCard
+        hasLastSet={Boolean(workout.lastSetLoggedAt)}
+        restTargetReached={restTargetReached}
+        restRemainingSeconds={restRemainingSeconds}
+        restElapsedSeconds={restElapsedSeconds}
+        restTargetSeconds={workout.restTargetSeconds}
+        restProgress={restProgress}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CircleDot className="h-4 w-4" />
-            Queue Mode
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {workout.queue.length === 0 ? (
-            <p className="text-sm text-slate-500">No queued movements yet. Create a movement to begin.</p>
-          ) : (
-            <ul className="space-y-2">
-              {workout.queue.map((queueItem: {
-                id: string;
-                movementId: string;
-                targetSets: number;
-                isSkipped: boolean;
-                movement: { name: string };
-              }, index: number) => {
-                const isActive = workout.activeMovementId === queueItem.movementId;
-                const completedSets = setCountsByMovementId.get(queueItem.movementId) ?? 0;
-                const isCompleted = completedSets >= queueItem.targetSets && !queueItem.isSkipped;
-                return (
-                  <li
-                    key={queueItem.id}
-                    className={`rounded-lg border px-3 py-2 flex items-center justify-between ${isActive ? "border-teal-500 bg-teal-50" : "border-slate-200 bg-white"}`}>
-                    <div>
-                      <p className={`font-medium ${queueItem.isSkipped ? "text-slate-400 line-through" : "text-slate-900"}`}>
-                        {index + 1}. {queueItem.movement.name}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {completedSets}/{queueItem.targetSets} sets
-                      </p>
-                      {isActive && <p className="text-xs text-teal-700">Active movement</p>}
-                      {isCompleted && (
-                        <p className="text-xs text-emerald-700 font-medium inline-flex items-center gap-1">
-                          <Check className="h-3 w-3" />
-                          Completed
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setQueueTargetSetsMutation.mutate({
-                            movementId: queueItem.movementId,
-                            targetSets: Math.max(1, queueItem.targetSets - 1),
-                          })
-                        }
-                        disabled={queueMutationIsPending || queueItem.targetSets <= 1}
-                        aria-label="Decrease target sets">
-                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Minus className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setQueueTargetSetsMutation.mutate({
-                            movementId: queueItem.movementId,
-                            targetSets: Math.min(12, queueItem.targetSets + 1),
-                          })
-                        }
-                        disabled={queueMutationIsPending || queueItem.targetSets >= 12}
-                        aria-label="Increase target sets">
-                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "up" })}
-                        disabled={queueMutationIsPending || index === 0}
-                        aria-label="Move up">
-                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => moveQueueItemMutation.mutate({ movementId: queueItem.movementId, direction: "down" })}
-                        disabled={queueMutationIsPending || index === workout.queue.length - 1}
-                        aria-label="Move down">
-                        {queueMutationIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant={isActive ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => activateQueueMovementMutation.mutate(queueItem.movementId)}
-                        disabled={queueMutationIsPending || isActive}>
-                        {queueMutationIsPending ? "loading..." : isActive ? "Active" : "Set Active"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setQueueItemSkippedMutation.mutate({
-                            movementId: queueItem.movementId,
-                            skipped: !queueItem.isSkipped,
-                          })
-                        }
-                        disabled={queueMutationIsPending}>
-                        {queueMutationIsPending ? "loading..." : queueItem.isSkipped ? "Unskip" : "Skip"}
-                      </Button>
-                      {queueMutationIsPending ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-slate-500" aria-live="polite">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          loading...
-                        </span>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <QueueModeCard
+        queue={workout.queue}
+        activeMovementId={workout.activeMovementId}
+        setCountsByMovementId={setCountsByMovementId}
+        queueMutationIsPending={queueMutationIsPending}
+        onDecreaseTargetSets={(movementId, targetSets) =>
+          setQueueTargetSetsMutation.mutate({
+            movementId,
+            targetSets: Math.max(1, targetSets - 1),
+          })
+        }
+        onIncreaseTargetSets={(movementId, targetSets) =>
+          setQueueTargetSetsMutation.mutate({
+            movementId,
+            targetSets: Math.min(12, targetSets + 1),
+          })
+        }
+        onMoveUp={(movementId) => moveQueueItemMutation.mutate({ movementId, direction: "up" })}
+        onMoveDown={(movementId) => moveQueueItemMutation.mutate({ movementId, direction: "down" })}
+        onActivate={(movementId) => activateQueueMovementMutation.mutate(movementId)}
+        onToggleSkip={(movementId, isSkipped) =>
+          setQueueItemSkippedMutation.mutate({
+            movementId,
+            skipped: !isSkipped,
+          })
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -643,174 +528,49 @@ function CurrentWorkoutPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              addSetForm.handleSubmit();
-            }}
-            className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
-            <addSetForm.Field name="selectedMovement">
-              {(field) => (
-                <Select value={field.state.value} onChange={(e) => handleMovementChange(e.target.value)}>
-                  <option value="">Select movement</option>
-                  {movementOptions.map((m: { id: string; name: string }) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </addSetForm.Field>
-            <addSetForm.Field name="weight">
-              {(field) => (
-                <Input
-                  type="number"
-                  placeholder={weightPlaceholder}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full"
-                  min={0}
-                  disabled={isSelectedMovementBodyweight}
-                />
-              )}
-            </addSetForm.Field>
-            <addSetForm.Field name="reps">
-              {(field) => (
-                <Input
-                  type="number"
-                  placeholder="Reps"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full"
-                  min={1}
-                />
-              )}
-            </addSetForm.Field>
-            <addSetForm.Field name="rpe">
-              {(field) => (
-                <Input
-                  type="number"
-                  placeholder="RPE (optional)"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full"
-                  min={1}
-                  max={10}
-                  step={0.5}
-                />
-              )}
-            </addSetForm.Field>
-            <addSetForm.Field name="notes">
-              {(field) => (
-                <Input
-                  placeholder="Notes (optional)"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full"
-                  maxLength={500}
-                />
-              )}
-            </addSetForm.Field>
-            <AddButton
-              type="submit"
-              size="sm"
-              disabled={!addSetForm.state.values.selectedMovement || !addSetForm.state.values.reps}
-              isLoading={addSetMutation.isPending}
-            />
-          </form>
+          <AddSetForm
+            selectedMovement={addSetForm.state.values.selectedMovement}
+            movementOptions={movementOptions}
+            weight={addSetForm.state.values.weight}
+            reps={addSetForm.state.values.reps}
+            rpe={addSetForm.state.values.rpe}
+            notes={addSetForm.state.values.notes}
+            weightPlaceholder={weightPlaceholder}
+            isSelectedMovementBodyweight={isSelectedMovementBodyweight}
+            isPending={addSetMutation.isPending}
+            canSubmit={Boolean(addSetForm.state.values.selectedMovement && addSetForm.state.values.reps)}
+            onMovementChange={handleMovementChange}
+            onWeightChange={(value) => addSetForm.setFieldValue("weight", value)}
+            onRepsChange={(value) => addSetForm.setFieldValue("reps", value)}
+            onRpeChange={(value) => addSetForm.setFieldValue("rpe", value)}
+            onNotesChange={(value) => addSetForm.setFieldValue("notes", value)}
+            onSubmit={() => addSetForm.handleSubmit()}
+          />
 
           {!canCompleteWorkout && (
             <p className="text-xs text-amber-700">Add at least one set before completing this workout.</p>
           )}
 
-          {workout.sets.length === 0 ? (
-            <p className="text-sm text-slate-500">No sets yet. Add exercises to your workout!</p>
-          ) : (
-            <ul className="space-y-2">
-              {workout.sets.map((set: {
-                id: string;
-                reps: number;
-                weight: number;
-                weightUnit: "kg" | "lbs";
-                rpe: number | null;
-                notes: string | null;
-                version: number;
-                movement: { name: string };
-              }) => (
-                <li key={set.id} className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{set.movement.name}</span>
-                    <span className="text-slate-500 ml-2">
-                      {set.reps} reps x {formatWeight(set.weight, set.weightUnit)}
-                    </span>
-                    {set.rpe != null && <span className="text-slate-500 ml-2">RPE {set.rpe}</span>}
-                    {set.notes && <p className="text-xs text-slate-500 mt-1">{set.notes}</p>}
-                    {editingSetId === set.id && (
-                      <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
-                        <Input
-                          type="number"
-                          value={reps}
-                          min={1}
-                          onChange={(event) => setReps(event.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          value={weight}
-                          min={0}
-                          onChange={(event) => setWeight(event.target.value)}
-                        />
-                        <Input type="number" value={rpe} min={1} max={10} step={0.5} onChange={(event) => setRpe(event.target.value)} />
-                        <Input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />
-                        <SaveButton
-                          size="sm"
-                          onClick={() => handleInlineSave(set.id, set.version)}
-                          disabled={updateSetMutation.isPending}
-                          isLoading={updateSetMutation.isPending}
-                          loadingText="loading...">
-                          Save
-                        </SaveButton>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <EditButton
-                      onClick={() => openEditor(set)}
-                      className="h-8 w-8 text-slate-400"
-                      iconOnly
-                    />
-                    <DeleteButton
-                      variant="ghost"
-                      size="icon"
-                      iconOnly
-                      onClick={() => requestDeleteSet(set.id)}
-                      className="h-8 w-8 text-slate-400"
-                      aria-label="Delete set">
-                      Delete set
-                    </DeleteButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <WorkoutSetsList
+            sets={workout.sets}
+            editingSetId={editingSetId}
+            reps={reps}
+            weight={weight}
+            rpe={rpe}
+            notes={notes}
+            isUpdatePending={updateSetMutation.isPending}
+            onOpenEditor={openEditor}
+            onRequestDelete={requestDeleteSet}
+            onRepsChange={setReps}
+            onWeightChange={setWeight}
+            onRpeChange={setRpe}
+            onNotesChange={setNotes}
+            onInlineSave={handleInlineSave}
+          />
         </CardContent>
       </Card>
 
-      {completionSummary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest Completion Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-slate-700">
-            Duration: {formatDurationSeconds(completionSummary.durationSeconds)}. Total volume: {" "}
-            {formatWeight(completionSummary.totalVolumeKg, "kg")}
-          </CardContent>
-        </Card>
-      )}
+      {completionSummary ? <LatestCompletionSummaryCard summary={completionSummary} /> : null}
 
       <ConfirmDialog
         open={pendingDeleteSetId != null}

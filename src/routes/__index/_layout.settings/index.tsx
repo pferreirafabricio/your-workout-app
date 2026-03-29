@@ -2,18 +2,20 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SaveButton, SubmitButton } from "@/components/ui/action-buttons";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "../_layout.current-workout/-queries/current-workout";
 import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/features/workouts/workouts.server";
 import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workouts.validation";
 import { nutritionGoalsQueryOptions } from "../_layout.nutrition/-queries/nutrition";
 import { upsertNutritionGoalsServerFn } from "@/lib/features/nutrition/nutrition.server";
-import { formatDateTime, formatWeight } from "@/lib/shared/utils";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { toast } from "sonner";
+import {
+  BodyweightFormCard,
+  NutritionGoalsFormCard,
+  PreferencesFormCard,
+  type NutritionGoalType,
+} from "@/components/features/settings";
 
 const COMMON_TIME_ZONES = [
   "UTC",
@@ -26,8 +28,6 @@ const COMMON_TIME_ZONES = [
   "Asia/Tokyo",
   "Australia/Sydney",
 ];
-
-type NutritionGoalType = "CUT" | "MAINTENANCE" | "BULK";
 
 export const Route = createFileRoute("/__index/_layout/settings/")({
   loader: async ({ context }) => {
@@ -197,224 +197,55 @@ function SettingsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              preferencesForm.handleSubmit();
-            }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <preferencesForm.Field name="weightUnit">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Weight unit
-                  </label>
-                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value as "kg" | "lbs")}> 
-                    <option value="kg">kg</option>
-                    <option value="lbs">lbs</option>
-                  </Select>
-                </div>
-              )}
-            </preferencesForm.Field>
-            <preferencesForm.Field name="defaultRestTargetSeconds">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Default rest target (seconds)
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    min={15}
-                    max={600}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </preferencesForm.Field>
-            <preferencesForm.Field name="timeZone">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Timezone
-                  </label>
-                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value)}>
-                    {COMMON_TIME_ZONES.map((zone) => (
-                      <option key={zone} value={zone}>
-                        {zone}
-                      </option>
-                    ))}
-                    {isCustomTimeZone ? (
-                      <option value={preferencesForm.state.values.timeZone}>{preferencesForm.state.values.timeZone}</option>
-                    ) : null}
-                  </Select>
-                </div>
-              )}
-            </preferencesForm.Field>
-            <SaveButton type="submit" disabled={preferencesMutation.isPending} isLoading={preferencesMutation.isPending}>
-              Save Preferences
-            </SaveButton>
-          </form>
-          <p className="text-xs text-slate-500 mt-3">Timestamps are stored in UTC and displayed in your selected timezone.</p>
-        </CardContent>
-      </Card>
+      <preferencesForm.Subscribe selector={(state) => state.values}>
+        {(values) => (
+          <PreferencesFormCard
+            values={values}
+            commonTimeZones={COMMON_TIME_ZONES}
+            isCustomTimeZone={isCustomTimeZone}
+            isPending={preferencesMutation.isPending}
+            onWeightUnitChange={(value) => preferencesForm.setFieldValue("weightUnit", value)}
+            onDefaultRestTargetSecondsChange={(value) => preferencesForm.setFieldValue("defaultRestTargetSeconds", value)}
+            onTimeZoneChange={(value) => preferencesForm.setFieldValue("timeZone", value)}
+            onSubmit={() => preferencesForm.handleSubmit()}
+          />
+        )}
+      </preferencesForm.Subscribe>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Record Bodyweight</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              bodyWeightForm.handleSubmit();
-            }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-            <bodyWeightForm.Field name="bodyWeight">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Bodyweight ({preferencesForm.state.values.weightUnit})</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </bodyWeightForm.Field>
-            <bodyWeightForm.Subscribe selector={(state) => state.values.bodyWeight}>
-              {(bodyWeight) => (
-                <SubmitButton
-                  type="submit"
-                  icon="save"
-                  disabled={bodyWeightMutation.isPending || !bodyWeight.trim()}
-                  isLoading={bodyWeightMutation.isPending}
-                  loadingText="Saving...">
-                  Record
-                </SubmitButton>
-              )}
-            </bodyWeightForm.Subscribe>
-          </form>
+      <bodyWeightForm.Subscribe selector={(state) => state.values.bodyWeight}>
+        {(bodyWeight) => (
+          <BodyweightFormCard
+            bodyWeight={bodyWeight}
+            weightUnit={preferencesForm.state.values.weightUnit}
+            selectedTimeZone={preferencesForm.state.values.timeZone}
+            latestBodyWeight={latestBodyWeight}
+            isPending={bodyWeightMutation.isPending}
+            onBodyWeightChange={(value) => bodyWeightForm.setFieldValue("bodyWeight", value)}
+            onSubmit={() => bodyWeightForm.handleSubmit()}
+          />
+        )}
+      </bodyWeightForm.Subscribe>
 
-          {latestBodyWeight ? (
-            <p className="text-sm text-slate-600 mt-4">
-              Latest entry: {formatWeight(latestBodyWeight.weight, latestBodyWeight.weightUnit)} at {" "}
-              {formatDateTime(latestBodyWeight.date, { timeZone: preferencesForm.state.values.timeZone })}
-            </p>
-          ) : (
-            <p className="text-sm text-slate-500 mt-4">No bodyweight entries yet.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Nutrition Goals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              nutritionGoalsForm.handleSubmit();
+      <nutritionGoalsForm.Subscribe selector={(state) => state.values}>
+        {(values) => (
+          <NutritionGoalsFormCard
+            values={values as {
+              calorieTarget: string;
+              proteinTargetG: string;
+              carbsTargetG: string;
+              fatsTargetG: string;
+              goalType: NutritionGoalType;
             }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-            <nutritionGoalsForm.Field name="calorieTarget">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Calorie Target (kcal)
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </nutritionGoalsForm.Field>
-            <nutritionGoalsForm.Field name="proteinTargetG">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Protein Target (g)
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </nutritionGoalsForm.Field>
-            <nutritionGoalsForm.Field name="carbsTargetG">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Carbs Target (g)
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </nutritionGoalsForm.Field>
-            <nutritionGoalsForm.Field name="fatsTargetG">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Fats Target (g)
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </nutritionGoalsForm.Field>
-            <nutritionGoalsForm.Field name="goalType">
-              {(field) => (
-                <div>
-                  <label className="text-sm font-medium text-slate-700" htmlFor={field.name}>
-                    Goal Type
-                  </label>
-                  <Select id={field.name} value={field.state.value} onChange={(event) => field.handleChange(event.target.value as NutritionGoalType)}> 
-                    <option value="CUT">Cut</option>
-                    <option value="MAINTENANCE">Maintenance</option>
-                    <option value="BULK">Bulk</option>
-                  </Select>
-                </div>
-              )}
-            </nutritionGoalsForm.Field>
-            <SaveButton type="submit" disabled={nutritionGoalsMutation.isPending} isLoading={nutritionGoalsMutation.isPending}>
-              Save Nutrition Goals
-            </SaveButton>
-          </form>
-        </CardContent>
-      </Card>
+            isPending={nutritionGoalsMutation.isPending}
+            onCalorieTargetChange={(value) => nutritionGoalsForm.setFieldValue("calorieTarget", value)}
+            onProteinTargetChange={(value) => nutritionGoalsForm.setFieldValue("proteinTargetG", value)}
+            onCarbsTargetChange={(value) => nutritionGoalsForm.setFieldValue("carbsTargetG", value)}
+            onFatsTargetChange={(value) => nutritionGoalsForm.setFieldValue("fatsTargetG", value)}
+            onGoalTypeChange={(value) => nutritionGoalsForm.setFieldValue("goalType", value)}
+            onSubmit={() => nutritionGoalsForm.handleSubmit()}
+          />
+        )}
+      </nutritionGoalsForm.Subscribe>
     </div>
   );
 }

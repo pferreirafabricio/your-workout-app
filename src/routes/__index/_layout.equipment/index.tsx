@@ -3,11 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
 import { Archive, ArchiveRestore, X } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { AddButton, CancelButton, EditButton, SaveButton } from "@/components/ui/action-buttons";
+import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  EquipmentFormCard,
+  EquipmentTable,
+  type EquipmentRow,
+} from "@/components/features/equipment";
 import {
   createEquipmentServerFn,
   setEquipmentActiveStateServerFn,
@@ -27,14 +29,6 @@ type EquipmentFormValues = {
   code: string;
   name: string;
   displayOrder: string;
-};
-
-type EquipmentRow = {
-  id: string;
-  code: string;
-  name: string;
-  isActive: boolean;
-  displayOrder: number;
 };
 
 const EMPTY_FORM: EquipmentFormValues = {
@@ -210,135 +204,23 @@ function EquipmentPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingId ? "Edit Equipment" : "Add Equipment"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
-            onSubmit={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              form.handleSubmit();
-            }}>
-            <form.Field name="code">
-              {(field) => (
-                <div>
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
-                    Code
-                  </label>
-                  <Input
-                    id={field.name}
-                    placeholder="BARBELL"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </form.Field>
+      <form.Subscribe selector={(state) => state.values}>
+        {(values) => (
+          <EquipmentFormCard
+            editing={editingId !== null}
+            values={values}
+            onCodeChange={(value) => form.setFieldValue("code", value)}
+            onNameChange={(value) => form.setFieldValue("name", value)}
+            onDisplayOrderChange={(value) => form.setFieldValue("displayOrder", value)}
+            onSubmit={() => form.handleSubmit()}
+            onCancel={cancelEdit}
+            isCreatePending={createMutation.isPending}
+            isUpdatePending={updateMutation.isPending}
+          />
+        )}
+      </form.Subscribe>
 
-            <form.Field name="name">
-              {(field) => (
-                <div>
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
-                    Name
-                  </label>
-                  <Input
-                    id={field.name}
-                    placeholder="Barbell"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </form.Field>
-
-            <form.Field name="displayOrder">
-              {(field) => (
-                <div>
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
-                    Display Order
-                  </label>
-                  <Input
-                    id={field.name}
-                    type="number"
-                    min={0}
-                    max={9999}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                </div>
-              )}
-            </form.Field>
-
-            <div className="flex gap-2">
-              {editingId ? (
-                <SaveButton type="submit" isLoading={updateMutation.isPending} loadingText="Saving...">
-                  Save
-                </SaveButton>
-              ) : (
-                <AddButton type="submit" isLoading={createMutation.isPending} loadingText="Creating...">
-                  Create
-                </AddButton>
-              )}
-              {editingId ? (
-                <CancelButton type="button" variant="ghost" onClick={cancelEdit}>
-                  Cancel
-                </CancelButton>
-              ) : null}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Equipment Catalog</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {equipment.length === 0 ? (
-            <p className="text-sm text-slate-500">No equipment entries yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {equipment.map((row) => (
-                <li key={row.id} className="bg-slate-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {row.name}
-                      {row.isActive ? null : <span className="ml-2 text-xs text-amber-700">Archived</span>}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      code: {row.code} | order: {row.displayOrder}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <EditButton type="button" size="sm" variant="ghost" onClick={() => beginEdit(row)} iconOnly={false}>
-                      Edit
-                    </EditButton>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setPendingToggleTarget(row)}>
-                      {row.isActive ? (
-                        <>
-                          <Archive className="h-4 w-4 mr-1" />
-                          Archive
-                        </>
-                      ) : (
-                        <>
-                          <ArchiveRestore className="h-4 w-4 mr-1" />
-                          Restore
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <EquipmentTable equipment={equipment} onEdit={beginEdit} onToggleActive={setPendingToggleTarget} />
 
       <ConfirmDialog
         open={pendingToggleTarget !== null}
