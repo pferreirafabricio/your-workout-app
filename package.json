@@ -12,7 +12,7 @@
     "serve": "vite preview",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "generate": "prisma generate",
+    "generate": "prisma generate && bunx tsr generate",
     "test": "bun run test:e2e",
     "test:unit": "vitest run src",
     "test:integration": "echo 'Integration tests are not implemented yet. Placeholder stage passed.'",
