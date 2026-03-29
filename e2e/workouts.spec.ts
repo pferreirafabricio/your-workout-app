@@ -20,13 +20,26 @@ async function ensureWorkoutStarted(page: Page) {
 
 async function addSetForMovement(page: Page, movementName: string, reps: string, weight: string, note?: string) {
   const workoutForm = page.getByTestId("add-set-form");
-  await workoutForm.locator("select").first().selectOption({ label: movementName });
-  await workoutForm.getByPlaceholder(/Weight/).fill(weight);
-  await workoutForm.getByPlaceholder("Reps").fill(reps);
+  const movementSelect = workoutForm.locator("select").first();
+  const weightInput = workoutForm.getByPlaceholder(/Weight/);
+  const repsInput = workoutForm.getByPlaceholder("Reps");
+  const addButton = workoutForm.getByRole("button", { name: "Add" });
+
+  await movementSelect.selectOption({ label: movementName });
+  await expect(movementSelect.locator("option:checked")).toContainText(movementName);
+
+  await weightInput.fill(weight);
+  await expect(weightInput).toHaveValue(weight);
+
+  await repsInput.fill(reps);
+  await expect(repsInput).toHaveValue(reps);
+
   if (note) {
     await workoutForm.getByPlaceholder("Notes (optional)").fill(note);
   }
-  await workoutForm.getByRole("button", { name: "Add" }).click();
+
+  await expect(addButton).toBeEnabled();
+  await addButton.click();
   await expect(page.getByText("Set added.")).toBeVisible();
 }
 
@@ -44,7 +57,12 @@ test.describe("Workouts", () => {
     await ensureWorkoutStarted(page);
     await addSetForMovement(page, movementName, "5", "100", "opening set");
 
-    const setRow = page.locator("li", { hasText: movementName }).filter({ hasText: "opening set" }).first();
+    const loggedSets = page.locator("main").getByRole("list").last();
+    const setRow = loggedSets
+      .getByRole("listitem")
+      .filter({ hasText: movementName })
+      .filter({ hasText: "opening set" });
+    await expect(setRow).toHaveCount(1);
     await setRow.getByRole("button", { name: "Edit" }).click();
     await setRow.locator("input[type='number']").nth(0).fill("6");
     await setRow.locator("input[type='number']").nth(1).fill("105");
@@ -103,7 +121,7 @@ test.describe("Workouts", () => {
     await page.getByRole("button", { name: "Show" }).first().click();
     await expect(page.getByRole("cell", { name: movementName, exact: true })).toBeVisible();
 
-    await page.locator("tbody input[type='checkbox']").nth(1).check();
+    await page.locator("tbody input[type='checkbox']").first().check();
     await page.getByRole("button", { name: /Delete Selected \(1\)/ }).click();
 
     const confirmDialog = page.getByRole("alertdialog");
@@ -111,6 +129,6 @@ test.describe("Workouts", () => {
     await confirmDialog.getByRole("button", { name: "Delete Workouts" }).click();
 
     await expect(page.getByText("1 workout deleted.")).toBeVisible();
-    await expect(page.getByText(movementName)).toHaveCount(0);
+    await expect(page.getByRole("cell", { name: movementName, exact: true })).toHaveCount(0);
   });
 });

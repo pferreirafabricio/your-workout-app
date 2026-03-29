@@ -18,30 +18,6 @@ test.describe("Equipment", () => {
     await expect(page.getByText(`code: ${code}`)).toBeVisible();
   });
 
-  // test("redirects unauthenticated users to sign-in", async ({ browser }) => {
-  //   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  //   const page = await context.newPage();
-  //   await page.goto("/equipment");
-  //   await expect(page).toHaveURL(/\/sign-in/);
-  //   await context.close();
-  // });
-
-  // test("surfaces safe error state when csrf token is invalid", async ({ page }) => {
-  //   await page.goto("/equipment");
-
-  //   await page.evaluate(() => {
-  //     globalThis.localStorage.setItem("csrf-token", "invalid-token");
-  //   });
-
-  //   const suffix = Date.now();
-  //   await page.getByLabel("Code").fill(`BROKEN_${suffix}`);
-  //   await page.getByLabel("Name").fill(`Broken ${suffix}`);
-  //   await page.getByLabel("Display Order").fill("5");
-  //   await page.getByRole("button", { name: "Create" }).click();
-
-  //   await expect(page.getByText("We could not save your changes. Please try again.")).toBeVisible();
-  // });
-
   test("edits and archives an equipment row", async ({ page }) => {
     await page.goto("/equipment");
 
