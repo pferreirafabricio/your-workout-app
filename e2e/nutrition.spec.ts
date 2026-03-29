@@ -70,6 +70,7 @@ test.describe("Nutrition", () => {
     await page.locator("#summary-date").fill(targetDate);
     await expect(page.getByText(/SURPLUS/i)).toBeVisible();
     await expect(page.getByText("Remaining")).toBeVisible();
+    await expect(page.getByTestId("remaining-calories-value")).toHaveText("0 kcal");
   });
 
   test("supports full saved foods CRUD flow", async ({ page }) => {

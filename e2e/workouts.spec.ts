@@ -26,6 +26,17 @@ async function addSetForMovement(page: Page, movementName: string, reps: string,
   const weightInput = workoutForm.getByPlaceholder(/Weight/);
   const repsInput = workoutForm.getByPlaceholder("Reps");
   const addButton = workoutForm.getByRole("button", { name: "Add" });
+  const loggedSets = page.locator("main").getByRole("list").last();
+
+  let createdSetRow = loggedSets
+    .getByRole("listitem")
+    .filter({ hasText: movementName })
+    .filter({ hasText: `${reps} reps x ${weight}` });
+  if (note) {
+    createdSetRow = createdSetRow.filter({ hasText: note });
+  }
+
+  const beforeCount = await createdSetRow.count();
 
   await expect(movementSelect).toBeEnabled();
   await movementSelect.selectOption({ label: movementName });
@@ -43,7 +54,7 @@ async function addSetForMovement(page: Page, movementName: string, reps: string,
 
   await expect(addButton).toBeEnabled();
   await addButton.click();
-  await expect(page.getByText("Set added.")).toBeVisible();
+  await expect(createdSetRow).toHaveCount(beforeCount + 1);
 }
 
 async function completeWorkout(page: Page) {
