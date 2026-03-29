@@ -4,10 +4,10 @@ import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/au
 import { getServerSidePrismaClient } from "@/lib/core/db.server";
 import {
   createEquipmentInputSchema,
-  mutationErrorMessages,
+  equipmentMutationErrorMessages,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/features/workouts/workout-progression";
+} from "@/lib/features/equipment/equipment.validation";
 
 type EquipmentMutationErrorCode = "CONFLICT" | "NOT_FOUND" | "PERSISTENCE_ERROR";
 
@@ -29,14 +29,14 @@ function mapEquipmentMutationError(error: unknown): EquipmentMutationErrorCode {
 
 function getEquipmentMutationErrorMessage(code: EquipmentMutationErrorCode): string {
   if (code === "CONFLICT") {
-    return mutationErrorMessages.equipmentConflict;
+    return equipmentMutationErrorMessages.equipmentConflict;
   }
 
   if (code === "NOT_FOUND") {
-    return mutationErrorMessages.equipmentNotFound;
+    return equipmentMutationErrorMessages.equipmentNotFound;
   }
 
-  return mutationErrorMessages.persistenceError;
+  return equipmentMutationErrorMessages.persistenceError;
 }
 
 function logEquipmentMutationError(operation: string, error: unknown, context: Record<string, string>) {
@@ -93,7 +93,7 @@ export const updateEquipmentServerFn = createServerFn({ method: "POST" })
       return {
         success: false as const,
         error: "NOT_FOUND" as const,
-        message: mutationErrorMessages.equipmentNotFound,
+        message: equipmentMutationErrorMessages.equipmentNotFound,
       };
     }
 
@@ -130,7 +130,7 @@ export const setEquipmentActiveStateServerFn = createServerFn({ method: "POST" }
       return {
         success: false as const,
         error: "NOT_FOUND" as const,
-        message: mutationErrorMessages.equipmentNotFound,
+        message: equipmentMutationErrorMessages.equipmentNotFound,
       };
     }
 

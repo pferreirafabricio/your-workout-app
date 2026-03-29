@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { bodyWeightSeriesQueryOptions, userPreferencesQueryOptions } from "../_layout.current-workout/-queries/current-workout";
 import { recordBodyWeightServerFn, setUserPreferencesServerFn } from "@/lib/features/workouts/workouts.server";
-import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workout-progression";
+import { recordBodyWeightInputSchema, setUserPreferencesInputSchema } from "@/lib/features/workouts/workouts.validation";
 import { nutritionGoalsQueryOptions } from "../_layout.nutrition/-queries/nutrition";
 import { upsertNutritionGoalsServerFn } from "@/lib/features/nutrition/nutrition.server";
 import { formatDateTime, formatWeight } from "@/lib/shared/utils";

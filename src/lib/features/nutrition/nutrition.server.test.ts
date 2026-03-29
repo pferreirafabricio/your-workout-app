@@ -116,6 +116,7 @@ describe("nutrition server", () => {
     ).rejects.toThrow();
   });
 
-  it.todo("adds integration coverage for food-entry lifecycle and total recomputation");
-  it.todo("adds integration coverage for goals-dependent summary visibility");
+  it("rejects daily log read without auth context", async () => {
+    await expect(getNutritionDailyLogServerFn({ data: { date: "2026-03-28" } })).rejects.toThrow();
+  });
 });

@@ -25,7 +25,7 @@ import {
   movementsQueryOptions,
   userPreferencesQueryOptions,
 } from "./-queries/current-workout";
-import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
+import { addSetInputSchema, updateSetInputSchema } from "@/lib/features/workouts/workouts.validation";
 import { formatDate, formatDurationSeconds, formatWeight } from "@/lib/shared/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";

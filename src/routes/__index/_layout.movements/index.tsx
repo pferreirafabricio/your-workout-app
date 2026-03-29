@@ -9,7 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { equipmentQueryOptions, movementsQueryOptions } from "./-queries/movements";
 import { Select } from "@/components/ui/select";
-import { archiveMovementInputSchema, createMovementInputSchema, updateMovementInputSchema } from "@/lib/features/workouts/workout-progression";
+import {
+  archiveMovementInputSchema,
+  createMovementInputSchema,
+  updateMovementInputSchema,
+} from "@/lib/features/movements/movements.validation";
 import { Archive, ArchiveRestore, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";

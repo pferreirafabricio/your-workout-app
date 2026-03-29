@@ -14,11 +14,8 @@ import {
   csrfTokenCookieName,
   refreshTokenCookieName,
 } from "@/lib/features/auth/auth.consts";
+import { signInInputSchema, strongPasswordSchema } from "@/lib/features/auth/auth.validation";
 import { getServerSidePrismaClient } from "@/lib/core/db.server";
-import {
-  signInInputSchema,
-  strongPasswordSchema,
-} from "@/lib/features/workouts/workout-progression";
 import { z } from "zod";
 
 // In production, use a proper secret from environment variables

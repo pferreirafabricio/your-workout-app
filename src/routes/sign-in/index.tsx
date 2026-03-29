@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/ui/action-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signInServerFn } from "@/lib/features/auth/auth.server";
-import { signInInputSchema } from "@/lib/features/workouts/workout-progression";
+import { signInInputSchema } from "@/lib/features/auth/auth.validation";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { formatRetryDelay } from "@/lib/shared/utils/time";
 import { UserPlus, Eye, EyeOff } from "lucide-react";

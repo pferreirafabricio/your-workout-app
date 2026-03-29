@@ -3,14 +3,18 @@ import { z } from "zod";
 import { getServerSidePrismaClient } from "@/lib/core/db.server";
 import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/auth.server";
 import { Prisma } from "../../../../prisma/generated/client/client";
-import { DEFAULT_REST_TARGET_SECONDS, type ProgressionMetric, type WeightUnit } from "@/lib/shared/consts";
+import { DEFAULT_REST_TARGET_SECONDS, type WeightUnit } from "@/lib/shared/consts";
 import { fromCanonicalKg, toCanonicalKg } from "@/lib/shared/utils";
+import {
+  buildProgressionSeries,
+  calculateSetVolume,
+  calculateWorkoutSummary,
+} from "@/lib/features/workouts/workouts.domain";
 import {
   activateWorkoutQueueMovementInputSchema,
   addSetInputSchema,
   deleteSetInputSchema,
   moveWorkoutQueueItemInputSchema,
-  mutationErrorMessages,
   parseOptionalDate,
   progressionSeriesInputSchema,
   recordBodyWeightInputSchema,
@@ -18,8 +22,9 @@ import {
   setWorkoutQueueItemTargetSetsInputSchema,
   setUserPreferencesInputSchema,
   updateSetInputSchema,
+  workoutMutationErrorMessages,
   workoutHistoryInputSchema,
-} from "@/lib/features/workouts/workout-progression";
+} from "@/lib/features/workouts/workouts.validation";
 
 const DEFAULT_QUEUE_TARGET_SETS = 3;
 
@@ -57,37 +62,6 @@ type ProjectedWorkoutQueueItem = {
     archivedAt: Date | null;
   };
 };
-
-export type WorkoutSummary = {
-  durationSeconds: number;
-  totalVolumeKg: number;
-  totalSets: number;
-};
-
-export function calculateSetVolume(weightKg: number, reps: number): number {
-  return Math.round(weightKg * reps * 100) / 100;
-}
-
-export function calculateWorkoutSummary(
-  startedAt: Date,
-  completedAt: Date,
-  sets: Array<{ weightSnapshotKg: number; reps: number; loggedAt: Date }>,
-): WorkoutSummary {
-  const firstSetLoggedAt =
-    sets.length > 0
-      ? sets.reduce((earliest, set) => (set.loggedAt < earliest ? set.loggedAt : earliest), sets[0].loggedAt)
-      : null;
-
-  const effectiveStartedAt =
-    firstSetLoggedAt && firstSetLoggedAt.getTime() > startedAt.getTime() ? firstSetLoggedAt : startedAt;
-
-  return {
-    durationSeconds: Math.max(0, Math.floor((completedAt.getTime() - effectiveStartedAt.getTime()) / 1000)),
-    totalVolumeKg:
-      Math.round(sets.reduce((sum, set) => sum + calculateSetVolume(set.weightSnapshotKg, set.reps), 0) * 100) / 100,
-    totalSets: sets.length,
-  };
-}
 
 function toDbWeightUnit(unit: WeightUnit): "KG" | "LBS" {
   return unit === "kg" ? "KG" : "LBS";
@@ -395,7 +369,7 @@ export const updateWorkoutServerFn = createServerFn({ method: "POST" })
     });
 
     if (!activeWorkout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const workout = await prisma.workout.update({
@@ -465,7 +439,7 @@ export const completeWorkoutServerFn = createServerFn({ method: "POST" })
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const completedAt = new Date();
@@ -498,7 +472,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const movement = await prisma.movement.findFirst({
@@ -506,7 +480,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
     });
 
     if (!movement || movement.archivedAt) {
-      return { success: false as const, error: mutationErrorMessages.movementArchived };
+      return { success: false as const, error: workoutMutationErrorMessages.movementArchived };
     }
 
     await ensureQueueItemExists(prisma, workout.id, movement.id);
@@ -524,7 +498,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
 
     if (movement.type === "BODYWEIGHT") {
       if (!latestBodyWeight) {
-        return { success: false as const, error: mutationErrorMessages.missingBodyweightContext };
+        return { success: false as const, error: workoutMutationErrorMessages.missingBodyweightContext };
       }
 
       bodyWeightSnapshot = latestBodyWeight.weightKg;
@@ -572,7 +546,7 @@ export const moveWorkoutQueueItemServerFn = createServerFn({ method: "POST" })
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const queueItems = await prisma.workoutQueueItem.findMany({
@@ -582,7 +556,7 @@ export const moveWorkoutQueueItemServerFn = createServerFn({ method: "POST" })
 
     const currentIndex = queueItems.findIndex((item) => item.movementId === data.movementId);
     if (currentIndex < 0) {
-      return { success: false as const, error: mutationErrorMessages.validationError };
+      return { success: false as const, error: workoutMutationErrorMessages.validationError };
     }
 
     const targetIndex = data.direction === "up" ? currentIndex - 1 : currentIndex + 1;
@@ -614,7 +588,7 @@ export const setWorkoutQueueItemSkippedServerFn = createServerFn({ method: "POST
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const queueItem = await prisma.workoutQueueItem.findUnique({
@@ -627,7 +601,7 @@ export const setWorkoutQueueItemSkippedServerFn = createServerFn({ method: "POST
     });
 
     if (!queueItem) {
-      return { success: false as const, error: mutationErrorMessages.validationError };
+      return { success: false as const, error: workoutMutationErrorMessages.validationError };
     }
 
     await prisma.workoutQueueItem.update({
@@ -658,7 +632,7 @@ export const setWorkoutQueueItemTargetSetsServerFn = createServerFn({ method: "P
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     const queueItem = await prisma.workoutQueueItem.findUnique({
@@ -671,7 +645,7 @@ export const setWorkoutQueueItemTargetSetsServerFn = createServerFn({ method: "P
     });
 
     if (!queueItem) {
-      return { success: false as const, error: mutationErrorMessages.validationError };
+      return { success: false as const, error: workoutMutationErrorMessages.validationError };
     }
 
     await prisma.workoutQueueItem.update({
@@ -694,7 +668,7 @@ export const activateWorkoutQueueMovementServerFn = createServerFn({ method: "PO
     });
 
     if (!workout) {
-      return { success: false as const, error: mutationErrorMessages.noActiveWorkout };
+      return { success: false as const, error: workoutMutationErrorMessages.noActiveWorkout };
     }
 
     await ensureQueueItemExists(prisma, workout.id, data.movementId);
@@ -734,7 +708,7 @@ export const updateSetServerFn = createServerFn({ method: "POST" })
     });
 
     if (!existingSet) {
-      return { success: false as const, error: mutationErrorMessages.setNotFound };
+      return { success: false as const, error: workoutMutationErrorMessages.setNotFound };
     }
 
     const replacementNotice =
@@ -794,7 +768,7 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
     });
 
     if (!set) {
-      return { success: false as const, error: mutationErrorMessages.setNotFound };
+      return { success: false as const, error: workoutMutationErrorMessages.setNotFound };
     }
 
     await prisma.set.delete({ where: { id: set.id } });
@@ -937,65 +911,6 @@ export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
 
     return { success: true as const };
   });
-
-function getDayKey(input: Date, timeZone: string): string {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(input);
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-  if (!year || !month || !day) {
-    return "1970-01-01";
-  }
-  return `${year}-${month}-${day}`;
-}
-
-function normalizeDay(input: Date): string {
-  return getDayKey(input, "UTC");
-}
-
-function normalizeDayForTimeZone(input: Date, timeZone: string): string {
-  try {
-    return getDayKey(input, timeZone);
-  } catch {
-    return normalizeDay(input);
-  }
-}
-
-export function buildProgressionSeries(
-  rows: Array<{ loggedAt: Date; reps: number; weightSnapshotKg: number }>,
-  metric: ProgressionMetric,
-  timeZone = "UTC",
-) {
-  const grouped = new Map<string, Array<{ reps: number; weightSnapshotKg: number }>>();
-
-  for (const row of rows) {
-    const key = normalizeDayForTimeZone(row.loggedAt, timeZone);
-    const bucket = grouped.get(key) ?? [];
-    bucket.push({ reps: row.reps, weightSnapshotKg: row.weightSnapshotKg });
-    grouped.set(key, bucket);
-  }
-
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, points]) => {
-      if (metric === "maxWeight") {
-        return { date, value: Math.max(...points.map((p) => p.weightSnapshotKg)) };
-      }
-      if (metric === "totalReps") {
-        return { date, value: points.reduce((sum, point) => sum + point.reps, 0) };
-      }
-      return {
-        date,
-        value: Math.round(points.reduce((sum, point) => sum + point.reps * point.weightSnapshotKg, 0) * 100) / 100,
-      };
-    });
-}
 
 export const getProgressionSeriesServerFn = createServerFn()
   .middleware([authMiddleware])

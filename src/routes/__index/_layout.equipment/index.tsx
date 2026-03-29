@@ -15,10 +15,10 @@ import {
 } from "@/lib/features/equipment/equipment.server";
 import {
   createEquipmentInputSchema,
-  mutationErrorMessages,
+  equipmentMutationErrorMessages,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/features/workouts/workout-progression";
+} from "@/lib/features/equipment/equipment.validation";
 import { getCsrfHeaders } from "@/lib/security/csrf.client";
 import { equipmentManagementQueryOptions } from "./-queries/equipment";
 import { toast } from "sonner";
@@ -87,7 +87,7 @@ function EquipmentPage() {
         });
 
         if (!parsed.success) {
-          const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
+          const message = parsed.error.issues[0]?.message ?? equipmentMutationErrorMessages.validationError;
           setError(message);
           toast.error(message);
           return;
@@ -99,7 +99,7 @@ function EquipmentPage() {
 
       const parsed = createEquipmentInputSchema.safeParse(normalizeEquipmentForm(value));
       if (!parsed.success) {
-        const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
+        const message = parsed.error.issues[0]?.message ?? equipmentMutationErrorMessages.validationError;
         setError(message);
         toast.error(message);
         return;
@@ -114,7 +114,7 @@ function EquipmentPage() {
       createEquipmentServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        const message = response.message ?? mutationErrorMessages.persistenceError;
+        const message = response.message ?? equipmentMutationErrorMessages.persistenceError;
         setError(message);
         toast.error(message);
         return;
@@ -132,7 +132,7 @@ function EquipmentPage() {
       updateEquipmentServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        const message = response.message ?? mutationErrorMessages.persistenceError;
+        const message = response.message ?? equipmentMutationErrorMessages.persistenceError;
         setError(message);
         toast.error(message);
         return;
@@ -151,7 +151,7 @@ function EquipmentPage() {
       setEquipmentActiveStateServerFn({ data: payload, headers: getCsrfHeaders() }),
     onSuccess: (response) => {
       if (!response.success) {
-        const message = response.message ?? mutationErrorMessages.persistenceError;
+        const message = response.message ?? equipmentMutationErrorMessages.persistenceError;
         setError(message);
         toast.error(message);
         return;
@@ -189,7 +189,7 @@ function EquipmentPage() {
     });
 
     if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? mutationErrorMessages.validationError;
+      const message = parsed.error.issues[0]?.message ?? equipmentMutationErrorMessages.validationError;
       setError(message);
       toast.error(message);
       setPendingToggleTarget(null);

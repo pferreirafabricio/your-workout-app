@@ -8,27 +8,14 @@ import {
   WEIGHT_UNITS,
 } from "@/lib/shared/consts";
 
-export const mutationErrorMessages = {
+export const workoutMutationErrorMessages = {
   validationError: "Please fix the highlighted fields and try again.",
   noActiveWorkout: "No active workout found.",
   movementArchived: "Archived movements cannot be logged in new sets.",
   missingBodyweightContext: "Record your bodyweight first to log this movement.",
   setNotFound: "Set not found for your active workout.",
   workoutNotFound: "Workout not found.",
-  lockout: "Too many failed sign-in attempts. Please wait before trying again.",
-  equipmentConflict: "Equipment code or name already exists.",
-  equipmentNotFound: "Equipment not found.",
-  persistenceError: "We could not save your changes. Please try again.",
 } as const;
-
-export const strongPasswordSchema = z
-  .string()
-  .min(8)
-  .max(256)
-  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,256}$/, {
-    message:
-      "Password must include uppercase, lowercase, number, and special character.",
-  });
 
 const isoDate = z
   .string()
@@ -104,66 +91,6 @@ export const activateWorkoutQueueMovementInputSchema = z.object({
 export const setWorkoutQueueItemTargetSetsInputSchema = z.object({
   movementId: z.string().min(1),
   targetSets: z.number().int().min(1).max(12),
-});
-
-export const createMovementInputSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  type: z.enum(["WEIGHTED", "BODYWEIGHT"]),
-  muscleGroup: z
-    .enum([
-      "CHEST",
-      "BACK",
-      "SHOULDERS",
-      "BICEPS",
-      "TRICEPS",
-      "QUADS",
-      "HAMSTRINGS",
-      "GLUTES",
-      "CALVES",
-      "CORE",
-      "FULL_BODY",
-    ])
-    .optional()
-    .nullable(),
-  equipmentId: z.string().optional().nullable(),
-});
-
-export const updateMovementInputSchema = createMovementInputSchema.extend({
-  movementId: z.string().min(1),
-});
-
-export const archiveMovementInputSchema = z.object({
-  movementId: z.string().min(1),
-  archive: z.boolean().default(true),
-});
-
-const equipmentCodeInputSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9_\-\s]+$/)
-  .transform((value) => value.toUpperCase().replaceAll(/[\s-]+/g, "_"));
-
-export const createEquipmentInputSchema = z.object({
-  code: equipmentCodeInputSchema,
-  name: z.string().trim().min(1).max(120),
-  displayOrder: z.number().int().min(0).max(9999),
-});
-
-export const updateEquipmentInputSchema = createEquipmentInputSchema.extend({
-  equipmentId: z.string().min(1),
-});
-
-export const setEquipmentActiveStateInputSchema = z.object({
-  equipmentId: z.string().min(1),
-  isActive: z.boolean(),
-});
-
-export const signInInputSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-  clientSource: z.string().min(1).max(200).optional(),
 });
 
 export const progressionSeriesInputSchema = z.object({

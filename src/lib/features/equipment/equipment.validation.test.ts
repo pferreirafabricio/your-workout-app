@@ -3,9 +3,9 @@ import {
   createEquipmentInputSchema,
   setEquipmentActiveStateInputSchema,
   updateEquipmentInputSchema,
-} from "@/lib/features/workouts/workout-progression";
+} from "@/lib/features/equipment/equipment.validation";
 
-describe("equipment validation schemas", () => {
+describe("equipment validation", () => {
   it("normalizes equipment code and accepts valid create payload", () => {
     const parsed = createEquipmentInputSchema.safeParse({
       code: "cable machine",

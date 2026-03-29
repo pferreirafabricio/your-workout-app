@@ -4,9 +4,9 @@ import { authMiddleware, csrfProtectionMiddleware } from "@/lib/features/auth/au
 import {
   archiveMovementInputSchema,
   createMovementInputSchema,
-  mutationErrorMessages,
+  movementMutationErrorMessages,
   updateMovementInputSchema,
-} from "@/lib/features/workouts/workout-progression";
+} from "@/lib/features/movements/movements.validation";
 
 export const createMovementServerFn = createServerFn({ method: "POST" })
   .middleware([csrfProtectionMiddleware, authMiddleware])
@@ -98,7 +98,7 @@ export const archiveMovementServerFn = createServerFn({ method: "POST" })
       if (setCount > 0) {
         return {
           success: false as const,
-          error: mutationErrorMessages.validationError,
+          error: movementMutationErrorMessages.validationError,
           message: "Cannot archive a movement currently used in your active workout.",
         };
       }

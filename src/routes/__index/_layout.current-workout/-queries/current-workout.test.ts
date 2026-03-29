@@ -18,7 +18,7 @@ import {
   movementsQueryOptions,
   userPreferencesQueryOptions,
 } from "./current-workout";
-import { updateSetInputSchema } from "@/lib/features/workouts/workout-progression";
+import { updateSetInputSchema } from "@/lib/features/workouts/workouts.validation";
 
 describe("current workout query options", () => {
   it("creates stable query key for current workout", async () => {
